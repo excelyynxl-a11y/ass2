@@ -69,19 +69,23 @@ number_unique_wastes_category
 
 ## 2. Number of negative feedback comments in the 'Description' column with an environmental impact score of 2 or 3
 
+### Observe the patterns of values of Description column
 ```{R}
-# observe the values of Description column
 waste_unique %>% select("Description")
+```
 
-# we observe the sentence structure "... Environmental Impact Score: 6/10 ..."
-# extract the value from "value/10" into a new column Env_Impact_Score
+### Sentence structure 
+Description: "... Environmental Impact Score: 6/10 ...". Extract the value from "value/10" into a new column Env_Impact_Score
+```{R}
 waste_unique <- waste_unique %>%
   mutate(Env_Impact_Score = str_extract(Description, "Environmental Impact Score: \\d+") %>%
            str_extract("\\d+") %>%
            as.numeric()
   )
+```
 
-# filter and count row with Env_Impact_Score value 2-3
+### Filter and count row with Env_Impact_Score value 2-3
+```{R}
 number_negative_env_impact_score <- waste_unique %>% 
   filter(Env_Impact_Score %in% c(2,3)) %>%
   nrow()
@@ -92,8 +96,7 @@ number_negative_env_impact_score
 ## 3. Calculate the fractions of waste tonnes of different waste sources, draw a chart to visualize the fraction numbers specific to the Category value
 
 ### Observe Stream column
-```{R}
-# observe unique Stream 
+```{R} 
 waste_unique %>% 
   select(Stream) %>%
   distinct(Stream)
@@ -198,13 +201,18 @@ temp
 ```
 
 ### Summary (min, max, mean) of each state
+The temp_state_summary has:
+1. State
+2. Min
+3. m\Mean
+4. Max
 ```{R}
 temp_state_summary <- temp %>%
   group_by(State) %>%
   summarise(
-      min = min(Total_Waste_Tonnes, na.rm = TRUE),
-      mean = mean(Total_Waste_Tonnes),
-      max = max(Total_Waste_Tonnes, na.rm = TRUE))
+      Min = min(Total_Waste_Tonnes, na.rm = TRUE),
+      Mean = mean(Total_Waste_Tonnes),
+      Max = max(Total_Waste_Tonnes, na.rm = TRUE))
 
 temp_state_summary
 ```
@@ -312,12 +320,16 @@ most_energy_recovered_waste_type <- energy_recovered_waste_type %>%
 
 most_energy_recovered_waste_type
 ```
-excelyynxl-a11y
 
+### Find first and last year data of each waste type
+The yearly_waste_type has:
+1. Type
+2. First_Year
+3. Last_Year
+4. First_Tonnes
+5. Last_Tonnes
+6. Change
 ```{R}
-# most increased waste Type over years
-year_formatted
-
 yearly_waste_type <- year_formatted %>%
   group_by(Type, Year) %>%
   summarise(
@@ -334,7 +346,10 @@ yearly_waste_type <- year_formatted %>%
   ungroup()
 
 yearly_waste_type
+```
 
+### Most incremented waste type
+```{R}
 most_incremented_waste_type <- yearly_waste_type %>%
   filter(Change == max(Change))
 
