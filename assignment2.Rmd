@@ -1,0 +1,354 @@
+---
+title: "assignment2"
+output: pdf_document
+date: "2026-08-25"
+---
+
+# Assignment 2
+Lim Excelyynx (34476245)
+
+## Approach
+
+My approach on completing Assignment 2 is by cleaning the dataset as I work through each question, rather than cleaning entire dataset prior to starting question 1. This ensures that i respect question-specific constraints.
+
+## Handling odd data values
+
+I am aware that the dataset contains unsensible values (eg: negative, NA, unformatted). This will be cleaned by making them consistent as described in Assignment2 brief as I work through each question.
+
+### Load tidyverse
+```{R}
+library(tidyverse)
+```
+
+### Load and save Wastes.csv and Year_State_ID.csv
+
+```{R}
+waste <- read_csv("data/Wastes.csv")
+waste
+
+year_state_id <- read_csv("data/Year_State_ID.csv")
+year_state_id
+```
+
+## 1. Number of unique "Category" values in Wastes.csv
+
+```{R}
+# observe unique category
+waste %>%
+  select(Category) %>%
+  distinct(Category)
+
+# we observe the following:
+# 1. "Building and demolition materials" and "Building & demolition materials" is category
+# 2. "Hazardous wastes" and "HW" is the same category
+# 3. "Plastics" and "Plastic" is the same category
+# 4. "Organics" and "organics" is the same category
+# 5. NA category is present
+waste_unique <- waste %>%
+  filter(!is.na(Category)) %>%
+  mutate(
+    Category = str_replace_all(Category, "&", "and"),
+    Category = str_replace_all(Category, "HW", "Hazardous wastes"),
+    Category = str_replace_all(Category, "^Plastic$", "Plastics"),
+    Category = str_replace_all(Category, "organics", "Organics")
+  )
+
+# observe new unique category
+# NA has been removed, "&" is replace with "and", "HW" is replace with "Hazardous Waste", "Plastic" is replace with "Plastics"
+waste_unique %>%
+  select(Category) %>%
+  distinct(Category)
+
+# get each distinct values in Category column and count total row
+number_unique_wastes_category <- waste_unique %>% 
+  distinct(Category) %>%
+  nrow()
+
+number_unique_wastes_category
+```
+
+## 2. Number of negative feedback comments in the 'Description' column with an environmental impact score of 2 or 3
+
+```{R}
+# observe the values of Description column
+waste_unique %>% select("Description")
+
+# we observe the sentence structure "... Environmental Impact Score: 6/10 ..."
+# extract the value from "value/10" into a new column Env_Impact_Score
+waste_unique <- waste_unique %>%
+  mutate(Env_Impact_Score = str_extract(Description, "Environmental Impact Score: \\d+") %>%
+           str_extract("\\d+") %>%
+           as.numeric()
+  )
+
+# filter and count row with Env_Impact_Score value 2-3
+number_negative_env_impact_score <- waste_unique %>% 
+  filter(Env_Impact_Score %in% c(2,3)) %>%
+  nrow()
+
+number_negative_env_impact_score
+```
+
+## 3. Calculate the fractions of waste tonnes of different waste sources, draw a chart to visualize the fraction numbers specific to the Category value
+
+### Observe Stream column
+```{R}
+# observe unique Stream 
+waste_unique %>% 
+  select(Stream) %>%
+  distinct(Stream)
+```
+
+### Clean Stream column:
+1. "Construction and demolition waste" should be "C&I"
+2. "Municipal solid waste"  should be "MSW"
+3. NA value should be removed
+```{R}
+waste_unique <- waste_unique %>%
+  mutate(Stream = str_replace_all(Stream, "Construction and demolition waste", "C&D"),
+         Stream = str_replace_all(Stream, "Municipal solid waste", "MSW")) %>% 
+  filter(!is.na(Stream))
+
+waste_unique
+```
+
+### Clean Tonnes column
+1. Remove Tonnes that are NA
+2. Remove Tonnes <= 0
+```{R}
+waste_unique <- waste_unique %>%
+  filter(!is.na(Tonnes)) %>%
+  filter(Tonnes > 0)
+
+waste_unique %>% select(Tonnes)
+```
+
+### Calculate waste fraction
+```{R}
+waste_fraction <- waste_unique %>%
+  group_by(Category, Stream) %>%
+  summarise(stream_tonnes = sum(Tonnes, na.rm = TRUE)) %>%
+  group_by(Category) %>%
+  mutate(
+    category_total = sum(stream_tonnes),
+    fraction = stream_tonnes / category_total
+  ) %>%
+  ungroup()
+
+waste_fraction
+```
+
+### Draw chart visualizing the fraction numbers specific to the Category value
+```{R}
+ggplot(waste_fraction, aes(x = Category, y = fraction, fill = Stream)) +
+  geom_col(position = "fill") +
+  labs(
+    title = "Fraction of Waste Tonnes by Source within each Category",
+    x = "Category",
+    y = "Fraction of Tonnes",
+    fill = "Stream"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+## 4. Add the 'Year' and 'State' values from Year_State_ID.csv to Wastes.csv, compute the total waste tonnes for each year and state, and store the result in a dataset named 'temp', compute and display the statistical information (min, max, mean) of the total waste tonnes for each state in ‘temp’
+
+### Clean waste:
+1. Remove all NA values
+2. Remove non-sensible Tonnes values (<= 0)
+3. Consistent Category values
+4. Consistent Stream values
+5. Extract Env_Score column from Description (IDK NEED MA)
+```{R}
+finalised_waste <- waste %>%
+  filter(!is.na(Category) & !is.na(Stream) & !is.na(`Core_Non-core`) & !is.na(Tonnes)) %>%
+  filter(Tonnes > 0) %>%
+  mutate(
+    Category = str_replace_all(Category, "&", "and"),
+    Category = str_replace_all(Category, "HW", "Hazardous wastes"),
+    Category = str_replace_all(Category, "^Plastic$", "Plastics"),
+    Category = str_replace_all(Category, "organics", "Organics")
+  ) %>%
+  mutate(Stream = str_replace_all(Stream, "Construction and demolition waste", "C&D"),
+         Stream = str_replace_all(Stream, "Municipal solid waste", "MSW")) %>%
+  mutate(Env_Impact_Score = str_extract(Description, "Environmental Impact Score: \\d+") %>%
+           str_extract("\\d+") %>%
+           as.numeric()
+  )
+
+finalised_waste
+```
+
+### Left-join year_state_id to finalised_waste. 
+Resulting temp table has:
+1. Year
+2. State
+3. Total_Waste_Tonnes
+```{R}
+temp <- finalised_waste %>%
+  left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
+  select(-Economic_Growth) %>%
+  mutate(State = str_to_upper(State)) %>%
+  group_by(Year, State) %>%
+  summarise(Total_Waste_Tonnes = sum(Tonnes, na.rm = TRUE))
+
+temp
+```
+
+### Summary (min, max, mean) of each state
+```{R}
+temp_state_summary <- temp %>%
+  group_by(State) %>%
+  summarise(
+      min = min(Total_Waste_Tonnes, na.rm = TRUE),
+      mean = mean(Total_Waste_Tonnes),
+      max = max(Total_Waste_Tonnes, na.rm = TRUE))
+
+temp_state_summary
+```
+
+## 5. Yearly trend of total waste tonnes of food organics for each state
+
+### Format year
+```{R}
+year_formatted <- finalised_waste %>%
+  left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
+  mutate(State = str_to_upper(State)) %>%
+  mutate(Year = as.numeric(str_extract(Year, "^\\d{4}")))
+
+year_formatted 
+```
+
+### Filter food organics
+The food_organics_waste table has:
+1. Year
+2. State
+3. Food_Organics_Tonnes
+```{R}
+food_organics_waste <- year_formatted %>%
+  filter(Type %in% c("Food organics")) %>%
+  group_by(Year, State) %>%
+  summarise(Food_Organics_Tonnes = sum(Tonnes, na.rm = TRUE))
+
+food_organics_waste
+```
+
+### Plot food organics by year
+```{R}
+ggplot(food_organics_waste, aes(x = Year, y = Food_Organics_Tonnes, color = State)) + 
+  geom_line(linewidth = 1) +
+  geom_point() + 
+  labs(
+    title = "Yearly Treand of Food Organics Waste Tonnes by State",
+    x = "Year",
+    y = "Total Food Organics Waste (Tonnes)",
+    color = "State"
+  ) +
+  theme_minimal()
+
+
+```
+
+## 6. Display the most recycled waste Type and the most energy-recovered waste Type with the corresponding year. Display the most increased waste Type over years
+
+### Waste with recycling as Fate
+```{R}
+fate_recycling <- year_formatted %>% 
+  filter(Fate %in% c("Recycling"))
+
+fate_recycling
+```
+
+### Sum per year of each waste type with recycling as Fate
+The recycled_waste_type table has:
+1. Type
+2. Year
+3. Recycled_Tonnes
+```{R}
+recycled_waste_type <- fate_recycling %>%
+  group_by(Type, Year) %>%
+  summarise(Recycled_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
+  ungroup()
+
+recycled_waste_type
+```
+
+### Most recycled waste type
+```{R}
+most_recycled_waste_type <- recycled_waste_type %>%
+  filter(Recycled_Tonnes == max(Recycled_Tonnes))
+
+most_recycled_waste_type
+```
+
+### Waste with energy-recovered as Fate
+```{R}
+fate_energy_recovery <- year_formatted %>%
+  filter(Fate %in% c("Energy recovery"))
+
+fate_energy_recovery
+```
+
+### Sum per year of each waste type with energy-recovered as Fate
+The energy_recovered_waste_type table has:
+1. Type
+2. Year
+3. Energy_Recovered_Tonnes
+```{R}
+energy_recovered_waste_type <- fate_energy_recovery %>%
+  group_by(Type, Year) %>%
+  summarise(Energy_Recovered_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
+  ungroup()
+
+energy_recovered_waste_type
+```
+
+### Most energy-recovered waste type
+```{R}
+most_energy_recovered_waste_type <- energy_recovered_waste_type %>%
+  filter(Energy_Recovered_Tonnes == max(Energy_Recovered_Tonnes))
+
+most_energy_recovered_waste_type
+```
+excelyynxl-a11y
+
+```{R}
+# most increased waste Type over years
+year_formatted
+
+yearly_waste_type <- year_formatted %>%
+  group_by(Type, Year) %>%
+  summarise(
+    Total_Tonnes = sum(Tonnes, na.rm = TRUE)
+  ) %>%
+  group_by(Type) %>%
+  summarise(
+    First_Year = min(Year),
+    Last_Year = max(Year),
+    First_Tonnes = Total_Tonnes[Year == min(Year)],
+    Last_Tonnes = Total_Tonnes[Year == max(Year)],
+    Change = Last_Tonnes - First_Tonnes
+  ) %>%
+  ungroup()
+
+yearly_waste_type
+
+most_incremented_waste_type <- yearly_waste_type %>%
+  filter(Change == max(Change))
+
+most_incremented_waste_type  
+```
+
+## 7.
+
+```{R}
+
+```
+
+## 8.
+
+```{R}
+
+```
