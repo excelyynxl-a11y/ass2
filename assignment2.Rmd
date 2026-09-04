@@ -356,10 +356,241 @@ most_incremented_waste_type <- yearly_waste_type %>%
 most_incremented_waste_type  
 ```
 
-## 7.
+## 7. Investigate the factors influencing environmental impact scores
 
+### Environmental Impact Score distribution
+```{R}
+ggplot(finalised_waste, aes(x = Env_Impact_Score)) + geom_bar()
+```
+
+### Is category a factor?
+Observation:
+- Toxic waste has lowest Mean_EIS
+- Aluminium, Glass, Paper and cardboard has highest Mean_EIS
+```{R}
+category <- finalised_waste %>%
+  group_by(Category) %>%
+  summarise(
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+    SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
+    Total_Count = n()
+) %>% arrange(Mean_EIS)
+
+category
+
+ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS)) + 
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Mean EIS by Category",
+    x = "Category",
+    y = "Mean EIS"
+  ) +
+  theme_minimal()
+
+finalised_waste %>% arrange(Category, Fate) %>% select(Category, Fate, Stream)
+```
+
+### Is Type a factor?
+```{R}
+type <- finalised_waste %>%
+  group_by(Type) %>%
+  summarise(
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+    SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
+    Total_Count = n()
+) %>% arrange(Mean_EIS)
+
+type
+
+ggplot(type, aes(x = reorder(Type, Mean_EIS), y = Mean_EIS)) + 
+  geom_col() +
+  labs(
+    title = "Mean EIS by Type",
+    x = "Type",
+    y = "Mean EIS"
+  ) +
+  theme_minimal()
+
+```
+
+### Is Category or Fate more influential over EIS?
 ```{R}
 
+```
+
+### Is Stream a factor?
+```{R}
+stream <- finalised_waste %>%
+  group_by(Stream) %>%
+  summarise(
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+    SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
+    Total_Count = n()
+) %>% arrange(Mean_EIS)
+
+stream
+
+ggplot(stream, aes(x = reorder(Stream, Mean_EIS), y = Mean_EIS)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Mean EIS by Stream",
+    x = "Stream",
+    y = "Mean EIS"
+  ) +
+  theme_minimal()
+```
+
+### Is Fate a factor?
+Observation:
+- Disposal has lowest Mean_EIS
+- Recycling has highest Mean_EIS
+```{R}
+fate <- finalised_waste %>%
+  group_by(Fate) %>%
+  summarise(
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+    SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
+    Total_Count = n()
+) %>% arrange(Mean_EIS)
+
+fate
+
+finalised_waste %>% group_by(Fate, Env_Impact_Score) %>% summarise(Total = sum(Env_Impact_Score)) %>% ungroup() %>% arrange(Env_Impact_Score)
+
+ggplot(fate, aes(x = reorder(Fate, Mean_EIS), y = Mean_EIS)) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Mean EIS by Fate",
+    x = "Fate",
+    y = "Mean EIS"
+  ) +
+  theme_minimal()
+```
+
+### Is Core_Non-core a factor?
+Observation:
+```{R}
+core_non_core <- finalised_waste %>%
+  group_by(`Core_Non-core`) %>%
+  summarise(
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+    SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
+    Total_Count = n()
+) %>% arrange(Mean_EIS)
+
+core_non_core
+
+```
+
+### State and Env_Impact_Score across the years
+```{R}
+state_score_summary <- finalised_waste %>%
+  left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
+  mutate(
+    State = str_to_upper(State),
+    Year = as.numeric(str_extract(Year, "^\\d{4}"))
+  ) %>%
+  group_by(Year, State) %>%
+  summarise(
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+    n = n(),
+  ) %>%
+  ungroup() %>%
+  arrange(Year)
+
+state_score_summary
+
+ggplot(state_score_summary, aes(x = Year, y = Mean_EIS, color = State)) + 
+  geom_line(linewidth = 1) +
+  geom_point() + 
+  facet_wrap(~ State) +
+  labs(
+    title = "Yearly Trend of Mean_EIS Tonnes by State",
+    x = "Year",
+    y = "Mean_EIS",
+    color = "State"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none" 
+    )
+```
+
+### State and Economic Growth across the years
+```{R}
+year_econ <- year_state_id %>% 
+  mutate(
+    State = str_to_upper(State),
+    Year = as.numeric(str_extract(Year, "^\\d{4}"))
+  ) %>% 
+  filter(State != "AUSTRALIA") %>%
+  arrange(Year)
+
+year_econ
+
+ggplot(year_econ, aes(x = Year, y = Economic_Growth, color = State)) + 
+  geom_line(linewidth = 1) +
+  geom_point() + 
+  facet_wrap(~ State) +
+  labs(
+    title = "Economic Growth over Years by State",
+    x = "Year",
+    y = "Economic Growth",
+    color = "State"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none" 
+    )
+```
+
+### State, Economic_Growth and Env_Impact_Score across the years
+```{R}
+state_econ_score_summary <- finalised_waste %>%
+  left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
+  mutate(
+    State = str_to_upper(State),
+    Year = as.numeric(str_extract(Year, "^\\d{4}"))
+  ) %>%
+  group_by(Year, State, Economic_Growth) %>%
+  summarise(
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+    n = n()
+  ) %>%
+  ungroup() %>%
+  arrange(Year)
+
+state_econ_score_summary
+
+# convert state_econ_score_summary to Year, State, Metric (Mean_EIS, Economic_Growth), Value
+state_econ_long <- state_econ_score_summary %>%
+  pivot_longer(
+    cols = c(Mean_EIS, Economic_Growth),
+    names_to = "Metric",
+    values_to = "Value"
+  )
+
+state_econ_long
+
+ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
+  geom_line(linewidth = 1) +
+  geom_point() + 
+  facet_grid(Metric ~ State, scales = "free_y") +
+  labs(
+    title = "Mean EIS and Economic Growth by State over Years",
+    x = "Year",
+    y = NULL
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
 ```
 
 ## 8.
