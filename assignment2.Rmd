@@ -11,10 +11,6 @@ Lim Excelyynx (34476245)
 
 My approach on completing Assignment 2 is by cleaning the dataset as I work through each question, rather than cleaning entire dataset prior to starting question 1. This ensures that i respect question-specific constraints.
 
-## Handling odd data values
-
-I am aware that the dataset contains unsensible values (eg: negative, NA, unformatted). This will be cleaned by making them consistent as described in Assignment2 brief as I work through each question.
-
 ### Load tidyverse
 ```{R}
 library(tidyverse)
@@ -30,35 +26,70 @@ year_state_id <- read_csv("data/Year_State_ID.csv")
 year_state_id
 ```
 
+## Handling missing value
+Prior to conducting analysis, I will handle missing values by first observing how many entries will be cleared off if I simply drop all missing value.
+```{R}
+total_raw_entries <- waste %>% nrow()
+total_raw_entries
+
+missing_entries <- waste %>% 
+  filter(if_any(everything(), is.na)) %>% 
+  nrow()
+
+missing_entries
+
+percentage_missing_entries <- (missing_entries / total_raw_entries) * 100
+
+percentage_missing_entries
+```
+
+I will handle missing value by dropping them because data is missing completely at random, only constitute less than 1% of all entries and sample is large enough that losing few rows will not effect analysis by too much.
+```{R}
+waste_drop <- waste %>%
+  drop_na()
+
+waste_drop
+```
+The waste_drop data will be used for all task.
+
 ## 1. Number of unique "Category" values in Wastes.csv
 
+Observe unique category
 ```{R}
-# observe unique category
-waste %>%
+waste_drop %>%
   select(Category) %>%
   distinct(Category)
+```
 
-# we observe the following:
-# 1. "Building and demolition materials" and "Building & demolition materials" is category
-# 2. "Hazardous wastes" and "HW" is the same category
-# 3. "Plastics" and "Plastic" is the same category
-# 4. "Organics" and "organics" is the same category
-# 5. NA category is present
-waste_unique <- waste %>%
+We observed the following:
+1. "Building & demolition materials" and "Building and demolition materials" is category
+2. "Hazardous wastes" and "HW" is the same category
+3. "Plastics" and "Plastic" is the same category
+4. "Organics" and "organics" is the same category
+```{R}
+# replace for consistency
+waste_unique <- waste_drop %>%
   filter(!is.na(Category)) %>%
   mutate(
-    Category = str_replace_all(Category, "&", "and"),
-    Category = str_replace_all(Category, "HW", "Hazardous wastes"),
-    Category = str_replace_all(Category, "^Plastic$", "Plastics"),
-    Category = str_replace_all(Category, "organics", "Organics")
+    Category = recode(
+      Category,
+      "HW" = "Hazardous wastes",
+      "Plastic" = "Plastics",
+      "organics" = "Organics",
+      "Building and demolition materials" = "Building & demolition materials"
+    )
   )
+```
 
-# observe new unique category
-# NA has been removed, "&" is replace with "and", "HW" is replace with "Hazardous Waste", "Plastic" is replace with "Plastics"
+Observe new unique category
+```{R}
 waste_unique %>%
   select(Category) %>%
   distinct(Category)
+```
 
+Count number of unique waste category
+```{R}
 # get each distinct values in Category column and count total row
 number_unique_wastes_category <- waste_unique %>% 
   distinct(Category) %>%
@@ -74,14 +105,20 @@ number_unique_wastes_category
 waste_unique %>% select("Description")
 ```
 
-### Sentence structure 
-Description: "... Environmental Impact Score: 6/10 ...". Extract the value from "value/10" into a new column Env_Impact_Score
+### Extract Env_Impact_Score 
+Description: "... Environmental Impact Score: 6/10 ...". 
+Extract the value from "value/10" into a new column Env_Impact_Score
 ```{R}
 waste_unique <- waste_unique %>%
   mutate(Env_Impact_Score = str_extract(Description, "Environmental Impact Score: \\d+") %>%
            str_extract("\\d+") %>%
            as.numeric()
   )
+
+waste_unique %>% 
+  select(Env_Impact_Score) %>% 
+  arrange(Env_Impact_Score)
+
 ```
 
 ### Filter and count row with Env_Impact_Score value 2-3
@@ -103,38 +140,74 @@ waste_unique %>%
 ```
 
 ### Clean Stream column:
+We observed from the Stream column:
 1. "Construction and demolition waste" should be "C&I"
 2. "Municipal solid waste"  should be "MSW"
-3. NA value should be removed
 ```{R}
 waste_unique <- waste_unique %>%
-  mutate(Stream = str_replace_all(Stream, "Construction and demolition waste", "C&D"),
-         Stream = str_replace_all(Stream, "Municipal solid waste", "MSW")) %>% 
-  filter(!is.na(Stream))
-
-waste_unique
+  mutate(
+    Stream = recode(
+      Stream,
+      "Construction and demolition waste" = "C&D",
+      "Municipal solid waste" = "MSW",
+      
+    )
+  )
 ```
 
-### Clean Tonnes column
-1. Remove Tonnes that are NA
-2. Remove Tonnes <= 0
+Observe new unique Stream
 ```{R}
-waste_unique <- waste_unique %>%
-  filter(!is.na(Tonnes)) %>%
-  filter(Tonnes > 0)
+waste_unique %>% 
+  select(Stream) %>%
+  distinct(Stream)
+```
 
-waste_unique %>% select(Tonnes)
+### Observe Tonnes column
+```{R} 
+waste_unique %>% 
+  select(Tonnes) %>%
+  arrange(Tonnes)
+```
+
+
+### Clean Tonnes column
+We observed Tonnes column:
+1. Negative values should be replaced with xxx
+2. Zero value should be replaced with xxx
+
+To decide on how to handle the non-sensible Tonnes value, I will start by observing how much non-sensible Tonnes value constitute in overall dataset.
+```{R}
+total_entries <- waste_unique %>% nrow()
+total_entries
+
+non_sensible_tonnes_entries <- waste_unique %>% filter(Tonnes < 0) %>% nrow()
+non_sensible_tonnes_entries
+
+percentage_non_sensi <- (non_sensible_tonnes_entries / total_entries) * 100
+
+percentage_non_sensi
+```
+
+I will drop off the non-sensible Tonnes values because it constitute only  less than 1% of original waste_unique dataset. 
+```{R}
+waste_tonnes_filtered <- waste_unique %>%
+  mutate(Tonnes = as.numeric(Tonnes)) %>%
+  filter(Tonnes >= 0)
+
+waste_tonnes_filtered %>% 
+  select(Tonnes) %>% 
+  arrange(Tonnes)
 ```
 
 ### Calculate waste fraction
 ```{R}
-waste_fraction <- waste_unique %>%
+waste_fraction <- waste_tonnes_filtered %>%
   group_by(Category, Stream) %>%
-  summarise(stream_tonnes = sum(Tonnes, na.rm = TRUE)) %>%
+  summarise(Stream_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
   group_by(Category) %>%
   mutate(
-    category_total = sum(stream_tonnes),
-    fraction = stream_tonnes / category_total
+    Category_Total = sum(Stream_Tonnes),
+    Fraction = Stream_Tonnes / Category_Total
   ) %>%
   ungroup()
 
@@ -142,8 +215,11 @@ waste_fraction
 ```
 
 ### Draw chart visualizing the fraction numbers specific to the Category value
+
 ```{R}
-ggplot(waste_fraction, aes(x = Category, y = fraction, fill = Stream)) +
+ggplot(
+  waste_fraction %>% filter(Fraction != 0), 
+  aes(x = Category, y = Fraction, fill = Stream)) +
   geom_col(position = "fill") +
   labs(
     title = "Fraction of Waste Tonnes by Source within each Category",
@@ -158,28 +234,9 @@ ggplot(waste_fraction, aes(x = Category, y = fraction, fill = Stream)) +
 
 ## 4. Add the 'Year' and 'State' values from Year_State_ID.csv to Wastes.csv, compute the total waste tonnes for each year and state, and store the result in a dataset named 'temp', compute and display the statistical information (min, max, mean) of the total waste tonnes for each state in ‘temp’
 
-### Clean waste:
-1. Remove all NA values
-2. Remove non-sensible Tonnes values (<= 0)
-3. Consistent Category values
-4. Consistent Stream values
-5. Extract Env_Score column from Description (IDK NEED MA)
+### Introduce a new finalised waste term for clarity
 ```{R}
-finalised_waste <- waste %>%
-  filter(!is.na(Category) & !is.na(Stream) & !is.na(`Core_Non-core`) & !is.na(Tonnes)) %>%
-  filter(Tonnes > 0) %>%
-  mutate(
-    Category = str_replace_all(Category, "&", "and"),
-    Category = str_replace_all(Category, "HW", "Hazardous wastes"),
-    Category = str_replace_all(Category, "^Plastic$", "Plastics"),
-    Category = str_replace_all(Category, "organics", "Organics")
-  ) %>%
-  mutate(Stream = str_replace_all(Stream, "Construction and demolition waste", "C&D"),
-         Stream = str_replace_all(Stream, "Municipal solid waste", "MSW")) %>%
-  mutate(Env_Impact_Score = str_extract(Description, "Environmental Impact Score: \\d+") %>%
-           str_extract("\\d+") %>%
-           as.numeric()
-  )
+finalised_waste <- waste_tonnes_filtered
 
 finalised_waste
 ```
@@ -195,7 +252,8 @@ temp <- finalised_waste %>%
   select(-Economic_Growth) %>%
   mutate(State = str_to_upper(State)) %>%
   group_by(Year, State) %>%
-  summarise(Total_Waste_Tonnes = sum(Tonnes, na.rm = TRUE))
+  summarise(Total_Waste_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
+  filter(State != "AUSTRALIA")
 
 temp
 ```
@@ -204,7 +262,7 @@ temp
 The temp_state_summary has:
 1. State
 2. Min
-3. m\Mean
+3. Mean
 4. Max
 ```{R}
 temp_state_summary <- temp %>%
