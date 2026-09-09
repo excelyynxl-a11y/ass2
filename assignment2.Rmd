@@ -7,10 +7,6 @@ date: "2026-08-25"
 # Assignment 2
 Lim Excelyynx (34476245)
 
-## Approach
-
-My approach on completing Assignment 2 is by cleaning the dataset as I work through each question, rather than cleaning entire dataset prior to starting question 1. This ensures that i respect question-specific constraints.
-
 ### Load tidyverse
 ```{R}
 library(tidyverse)
@@ -66,6 +62,8 @@ We observed the following:
 2. "Hazardous wastes" and "HW" is the same category
 3. "Plastics" and "Plastic" is the same category
 4. "Organics" and "organics" is the same category
+
+Same meaning terms will be replaced with one consistent name across Category column using recode.
 ```{R}
 # replace for consistency
 waste_unique <- waste_drop %>%
@@ -88,7 +86,7 @@ waste_unique %>%
   distinct(Category)
 ```
 
-Count number of unique waste category
+To count number of unique waste category, I get the number of rows of unique data from Category column in waste_unique table.
 ```{R}
 # get each distinct values in Category column and count total row
 number_unique_wastes_category <- waste_unique %>% 
@@ -106,8 +104,9 @@ waste_unique %>% select("Description")
 ```
 
 ### Extract Env_Impact_Score 
-Description: "... Environmental Impact Score: 6/10 ...". 
-Extract the value from "value/10" into a new column Env_Impact_Score
+It is observed that Description values looks like "... Environmental Impact Score: 6/10 ...". 
+
+To obtain environmental impact score, I extract the value from "value/10" of Description column into a new column called Env_Impact_Score.
 ```{R}
 waste_unique <- waste_unique %>%
   mutate(Env_Impact_Score = str_extract(Description, "Environmental Impact Score: \\d+") %>%
@@ -122,6 +121,7 @@ waste_unique %>%
 ```
 
 ### Filter and count row with Env_Impact_Score value 2-3
+To count number of entries with Env_Impact_Score value of 2-3, I filter only rows with Env_Impact_Score = 2 or 3 and count the number of rows.
 ```{R}
 number_negative_env_impact_score <- waste_unique %>% 
   filter(Env_Impact_Score %in% c(2,3)) %>%
@@ -132,7 +132,7 @@ number_negative_env_impact_score
 
 ## 3. Calculate the fractions of waste tonnes of different waste sources, draw a chart to visualize the fraction numbers specific to the Category value
 
-### Observe Stream column
+Observe Stream column
 ```{R} 
 waste_unique %>% 
   select(Stream) %>%
@@ -143,6 +143,8 @@ waste_unique %>%
 We observed from the Stream column:
 1. "Construction and demolition waste" should be "C&I"
 2. "Municipal solid waste"  should be "MSW"
+
+For consistency, all Stream values will be replace to only 3 options: C&I, C&D, MSW using recode.
 ```{R}
 waste_unique <- waste_unique %>%
   mutate(
@@ -162,7 +164,7 @@ waste_unique %>%
   distinct(Stream)
 ```
 
-### Observe Tonnes column
+Observe Tonnes column
 ```{R} 
 waste_unique %>% 
   select(Tonnes) %>%
@@ -200,6 +202,10 @@ waste_tonnes_filtered %>%
 ```
 
 ### Calculate waste fraction
+To calculate waste fraction, I created a new waste_fraction table by grouping waste_tonnes_filtered by Category and Stream.
+Stream_Tonnes is then obtained by summing Tonnes in each group. 
+Category_Total is sum of Stream_Tonnes.
+Fraction is Stream_Tonnes / Category_Total
 ```{R}
 waste_fraction <- waste_tonnes_filtered %>%
   group_by(Category, Stream) %>%
@@ -215,12 +221,12 @@ waste_fraction
 ```
 
 ### Draw chart visualizing the fraction numbers specific to the Category value
-
+To visualise the fraction number specific to category value, I created a stacked bar plot where x-axis represent Category and y-axis represent Fraction of Tonnes, with colour of bar to distinguish each Stream. 
 ```{R}
 ggplot(
   waste_fraction %>% filter(Fraction != 0), 
   aes(x = Category, y = Fraction, fill = Stream)) +
-  geom_col(position = "fill") +
+  geom_bar(stat = "identity", position = "fill") +
   labs(
     title = "Fraction of Waste Tonnes by Source within each Category",
     x = "Category",
@@ -234,7 +240,7 @@ ggplot(
 
 ## 4. Add the 'Year' and 'State' values from Year_State_ID.csv to Wastes.csv, compute the total waste tonnes for each year and state, and store the result in a dataset named 'temp', compute and display the statistical information (min, max, mean) of the total waste tonnes for each state in ‘temp’
 
-### Introduce a new finalised waste term for clarity
+Introduce a new finalised waste term for clarity
 ```{R}
 finalised_waste <- waste_tonnes_filtered
 
@@ -242,6 +248,12 @@ finalised_waste
 ```
 
 ### Left-join year_state_id to finalised_waste. 
+To combine both year_state_id and finalised_waste dataset to obtain the Year and State attribute, I left joined finalised_waste to year_state_id. State is uppercased for consistency. 
+
+To calculate Tonnes_Waste_Year, Year and State are grouped in order to compute Tonnes_Waste_Year by summing Tonnes of each group.
+
+The odd "AUSTRALIA" is filtered out since it is not a valid state.
+
 Resulting temp table has:
 1. Year
 2. State
@@ -258,19 +270,26 @@ temp <- finalised_waste %>%
 temp
 ```
 
-### Summary (min, max, mean) of each state
+### Summary (min, q1, median, q3, max, mean) of each state
+To obtain the summary, statistical metric for Total_Waste_Tonnes is obtained using summary() function.
 The temp_state_summary has:
 1. State
 2. Min
-3. Mean
-4. Max
+3. First_Quartile
+4. Median
+5. Third_Quartile
+6. Max
+7. Mean
 ```{R}
 temp_state_summary <- temp %>%
   group_by(State) %>%
   summarise(
       Min = min(Total_Waste_Tonnes, na.rm = TRUE),
-      Mean = mean(Total_Waste_Tonnes),
-      Max = max(Total_Waste_Tonnes, na.rm = TRUE))
+      First_Quartile = quantile(Total_Waste_Tonnes, 0.25, na.rm = TRUE),
+      Median = median(Total_Waste_Tonnes, na.rm = TRUE),
+      Third_Quartile = quantile(Total_Waste_Tonnes, 0.75, na.rm = TRUE),
+      Max = max(Total_Waste_Tonnes, na.rm = TRUE),
+      Mean = mean(Total_Waste_Tonnes),)
 
 temp_state_summary
 ```
@@ -278,7 +297,9 @@ temp_state_summary
 ## 5. Yearly trend of total waste tonnes of food organics for each state
 
 ### Format year
+To format the year from, for example: "2020-2021" to "2020", a new year_formatted table is created by left-joining finalised_waste with year_state_id. Year is extracted by concatenating the first 4 digit from original Year column.
 ```{R}
+year_state_id
 year_formatted <- finalised_waste %>%
   left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
   mutate(State = str_to_upper(State)) %>%
@@ -288,6 +309,10 @@ year_formatted
 ```
 
 ### Filter food organics
+Before analysing foor organics, a new food_organics_waste table with only data of food organics is created. 
+The entries consist of filtered Type that equals "Food Organics".
+To obtain Food_Organic_Tonnes, table is grouped by Year and State, then obtained by summing each group Tonnes values.
+
 The food_organics_waste table has:
 1. Year
 2. State
@@ -302,12 +327,13 @@ food_organics_waste
 ```
 
 ### Plot food organics by year
+To visualise yearly trend of food organics waste tonnes by state, a line chart is plotted with x-axis as year and y-axis as total food organics waste tonnes.
 ```{R}
 ggplot(food_organics_waste, aes(x = Year, y = Food_Organics_Tonnes, color = State)) + 
   geom_line(linewidth = 1) +
   geom_point() + 
   labs(
-    title = "Yearly Treand of Food Organics Waste Tonnes by State",
+    title = "Yearly Trend of Food Organics Waste Tonnes by State",
     x = "Year",
     y = "Total Food Organics Waste (Tonnes)",
     color = "State"
@@ -320,6 +346,8 @@ ggplot(food_organics_waste, aes(x = Year, y = Food_Organics_Tonnes, color = Stat
 ## 6. Display the most recycled waste Type and the most energy-recovered waste Type with the corresponding year. Display the most increased waste Type over years
 
 ### Waste with recycling as Fate
+Before analysing recycling fate waste, a new fate_recycling table with only data of recycling fate is created. 
+The entries consist of filtered Fate that equals "Recycling".
 ```{R}
 fate_recycling <- year_formatted %>% 
   filter(Fate %in% c("Recycling"))
@@ -328,6 +356,7 @@ fate_recycling
 ```
 
 ### Sum per year of each waste type with recycling as Fate
+To obtain Recycled_Tonnes, fate_recycling table is grouped by Type and Year, then obtained by summing each group Tonnes values.
 The recycled_waste_type table has:
 1. Type
 2. Year
@@ -342,6 +371,7 @@ recycled_waste_type
 ```
 
 ### Most recycled waste type
+To obtain the most recycled waste type, we filter entry with its Recycled_Tonnes equating to the max of the Recycled_Tonnes.
 ```{R}
 most_recycled_waste_type <- recycled_waste_type %>%
   filter(Recycled_Tonnes == max(Recycled_Tonnes))
@@ -350,6 +380,8 @@ most_recycled_waste_type
 ```
 
 ### Waste with energy-recovered as Fate
+Before analysing energy-recovered fate waste, a new fate_energy_recovered table with only data of energy-recovered fate is created. 
+The entries consist of filtered Fate that equals "Energy Recovered".
 ```{R}
 fate_energy_recovery <- year_formatted %>%
   filter(Fate %in% c("Energy recovery"))
@@ -358,6 +390,7 @@ fate_energy_recovery
 ```
 
 ### Sum per year of each waste type with energy-recovered as Fate
+To obtain Energy_Recovered_Tonnes, fate_energy_recovered table is grouped by Type and Year, then obtained by summing each group Tonnes values.
 The energy_recovered_waste_type table has:
 1. Type
 2. Year
@@ -372,6 +405,7 @@ energy_recovered_waste_type
 ```
 
 ### Most energy-recovered waste type
+To obtain the most energy-recovered waste type, we filter entry with its Energy_Recovered_Tonnes equating to the max of the Energy_Recovered_Tonnes
 ```{R}
 most_energy_recovered_waste_type <- energy_recovered_waste_type %>%
   filter(Energy_Recovered_Tonnes == max(Energy_Recovered_Tonnes))
@@ -380,6 +414,8 @@ most_energy_recovered_waste_type
 ```
 
 ### Find first and last year data of each waste type
+Create a new yearly_waste_type table with all interested years data.
+Change is calculated as the difference between tonnes recorded from the latest year and earliest year for each type of waste.
 The yearly_waste_type has:
 1. Type
 2. First_Year
@@ -407,6 +443,7 @@ yearly_waste_type
 ```
 
 ### Most incremented waste type
+To obtain the most incremented waste_type, filter all row to obtain Change that equates to highest changes value of the column.
 ```{R}
 most_incremented_waste_type <- yearly_waste_type %>%
   filter(Change == max(Change))
@@ -414,11 +451,55 @@ most_incremented_waste_type <- yearly_waste_type %>%
 most_incremented_waste_type  
 ```
 
-## 7. Investigate the factors influencing environmental impact scores
+## 7. Investigate the factors influencing environmental impact scores (EIS)
+To analyse the factors influencing EIS, I will be using the previous finalise_waste dataset containing all required information combined from Waste.csv and Year_State_ID.csv
+```{R}
+glimpse(finalised_waste)
+```
 
 ### Environmental Impact Score distribution
+Visualise EIS distribution across 1-10.
 ```{R}
 ggplot(finalised_waste, aes(x = Env_Impact_Score)) + geom_bar()
+```
+
+
+
+
+Env_Impact_Score is ordinal (can be nominal as well).
+Tonnes, Economic_Growth is continuous variable.
+Category, Type, Stream, Fate, Core_None-core are nominal.
+
+```{R}
+ggplot(year_formatted, aes(x = Env_Impact_Score, y = Economic_Growth, fill = State)) +
+  geom_boxplot() +
+  labs(x = "Env Impact Score", y = "Economic Growth",
+       title = "Env_Impact_Score agasint Economic_Growth") + 
+  theme_minimal()
+```
+
+```{R}
+conti_table_eis_category <- table(year_formatted$Env_Impact_Score, year_formatted$Category)
+
+chisq.test(conti_table_eis_category)
+```
+
+```{R}
+conti_table_eis_stream <- table(year_formatted$Env_Impact_Score, year_formatted$Stream)
+
+chisq.test(conti_table_eis_stream)
+```
+
+```{R}
+conti_table_eis_fate <- table(year_formatted$Env_Impact_Score, year_formatted$Fate)
+
+chisq.test(conti_table_eis_fate)
+```
+
+```{R}
+conti_table_eis_core_non <- table(year_formatted$Env_Impact_Score, year_formatted$`Core_Non-core`)
+
+chisq.test(conti_table_eis_core_non)
 ```
 
 ### Is category a factor?
@@ -426,8 +507,9 @@ Observation:
 - Toxic waste has lowest Mean_EIS
 - Aluminium, Glass, Paper and cardboard has highest Mean_EIS
 ```{R}
+year_state_id
 category <- finalised_waste %>%
-  group_by(Category) %>%
+  group_by(Category, Stream) %>%
   summarise(
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
     SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
@@ -436,17 +518,17 @@ category <- finalised_waste %>%
 
 category
 
-ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS)) + 
-  geom_col() +
+ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS, fill = Stream)) + 
+  geom_col(position = "dodge") +
   coord_flip() +
   labs(
     title = "Mean EIS by Category",
     x = "Category",
-    y = "Mean EIS"
+    y = "Mean EIS",
+    fill = "Stream"
   ) +
   theme_minimal()
 
-finalised_waste %>% arrange(Category, Fate) %>% select(Category, Fate, Stream)
 ```
 
 ### Is Type a factor?
