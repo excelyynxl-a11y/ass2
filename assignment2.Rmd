@@ -63,7 +63,7 @@ Some concerning Category are observed. We need to make the Category naming consi
 # record a list of concerning values 
 concerning_category <- c(
   "Building & demolition materials",
-  "Hazardous wastes",
+  "Toxic wastes",
   "Plastic",
   "organics",
   "Aluminium",
@@ -75,7 +75,8 @@ concerning_category <- c(
 # inspect concerning Category values to determine appropriate way on how to replace
 waste_drop %>%
   filter(
-    Category %in% suspicious_categories
+    Category %in% concerning_category |
+      is.na(Category)
   ) %>%
   select(
     Category,
@@ -85,9 +86,33 @@ waste_drop %>%
   )
 ```
 
-Some concerning Category are observed: 1. "Building & demolition materials" and "Building and demolition materials" is the same Category but naming unconsistency. 2. "Hazardous wastes" and "HW" is the same Category but naming unconsistency. 3. "Plastic" and "Plastics" is the same Category but naming unconsistency. 4. "organics" and "Organics" is the same Category but naming unconsistency. 5. "Aluminium" is a Type, not Category. Should be replaced with "Metals" 6. "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics". 7. "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency. 8. "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
+Some concerning Category are observed: 
+1. "Building & demolition materials" and "Building and demolition materials" is the same Category but naming unconsistency. 
+2. "Hazardous wastes" and "HW" is the same Category but naming unconsistency. 
+3. "Plastic" and "Plastics" is the same Category but naming unconsistency. 4. "organics" and "Organics" is the same Category but naming unconsistency. 
+5. "Aluminium" is a Type, not Category. Should be replaced with "Metals" 6. "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics". 
+7. "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency. 
+8. "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
 
-Same meaning terms will be replaced with one consistent name across Category column using recode.
+Some concerning NA Category are further analyse to determine a suitable replacement. We can create a na_category_type table to infer waste of similar Type has what kind of category.
+This is done by joining na_category_type and waste_drop table.
+```{R}
+na_category_type <- waste_drop %>% 
+  filter(
+    is.na(Category)
+  ) %>% distinct(Type)
+
+na_category_type
+
+waste %>% semi_join(
+  na_category_type,
+  by = "Type"
+) %>% select(Category, Type)
+```
+It is observed that the NA Category values with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)" belongs to Category of "Hazardous wastes", informing us:
+9. NA entry with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)", which is suitable to be replaced with "Hazardous wastes".
+
+Now, values of Category column will be updated using recode() and case_when() accordingly.
 
 ```{R}
 # replace for consistency and correctness
@@ -107,6 +132,16 @@ waste_unique <- waste_drop %>%
       "Metals & Organics" = "Organics",
       "Toxic wastes" = "Hazardous wastes",
       "Recycling" = "Plastics"
+    ),
+    Category = case_when(
+      # missing Category is inferred from their Type
+      is.na(Category) &
+        Type == "Other soil/sludges (other N)" ~
+        "Hazardous wastes",
+      is.na(Category) &
+        Type == "Paints, resins, inks, organic sludges (F)" ~
+        "Hazardous wastes",
+      TRUE ~ Category
     )
   )
 ```
@@ -175,7 +210,7 @@ number_negative_env_impact_score
 ```
 
 ### Q2 Final Answer
-Total negative feedback commecnts in "Description" with environmental impact score of 2 or 3 = `r number_negative_env_impact_score`
+Total negative feedback comments in "Description" with environmental impact score of 2 or 3 = `r number_negative_env_impact_score`
 
 ## Q3. Calculate the fractions of waste tonnes of different waste sources, draw a chart to visualize the fraction numbers specific to the Category value
 
@@ -335,7 +370,8 @@ temp_state_summary <- temp %>%
       Median = median(Total_Waste_Tonnes, na.rm = TRUE),
       Third_Quartile = quantile(Total_Waste_Tonnes, 0.75, na.rm = TRUE),
       Max = max(Total_Waste_Tonnes, na.rm = TRUE),
-      Mean = mean(Total_Waste_Tonnes),)
+      Mean = mean(Total_Waste_Tonnes)
+    )
 
 temp_state_summary
 ```
@@ -500,6 +536,7 @@ most_incremented_waste_type <- yearly_waste_type %>%
 most_incremented_waste_type  
 ```
 
+
 ## Q7. Investigate the factors influencing environmental impact scores (EIS)
 
 To analyse the factors influencing EIS, I will be using the previous finalise_waste dataset containing all required information combined from Waste.csv and Year_State_ID.csv
@@ -509,22 +546,25 @@ glimpse(finalised_waste)
 ```
 
 ### Environmental Impact Score distribution
-
-Visualise EIS distribution across 1-10.
-
+Firstly, we need to identify EIS is continuous or discrete.
 ```{R}
-ggplot(finalised_waste, aes(x = Env_Impact_Score)) + geom_bar()
+finalised_waste %>% 
+  distinct(Env_Impact_Score) %>% 
+  arrange(Env_Impact_Score)
 ```
-
-Env_Impact_Score is ordinal (can be nominal as well). Tonnes, Economic_Growth is continuous variable. Category, Type, Stream, Fate, Core_None-core are nominal.
-
+Here, we observed the valid EIS found in in dataset are 1, 2, 3, 4, 5, 6, 8 -- indicating EIS is discrete.
+When we visualise EIS distribution using a bar-chart, we can clearly observe EIS is categorical rather than continuous.
 ```{R}
-ggplot(year_formatted, aes(x = Env_Impact_Score, y = Economic_Growth, fill = State)) +
-  geom_boxplot() +
-  labs(x = "Env Impact Score", y = "Economic Growth",
-       title = "Env_Impact_Score agasint Economic_Growth") + 
+ggplot(finalised_waste, aes(x = Env_Impact_Score)) + 
+  geom_bar(fill = "steelblue") + 
+  labs(
+    title = "Distribution of Environmental Impact Scores",
+    x = "Environmental Impact Score",
+    y = "Count"
+  ) +
   theme_minimal()
 ```
+
 
 ```{R}
 conti_table_eis_category <- table(year_formatted$Env_Impact_Score, year_formatted$Category)
@@ -551,13 +591,11 @@ chisq.test(conti_table_eis_core_non)
 ```
 
 ### Is category a factor?
-
-Observation: - Toxic waste has lowest Mean_EIS - Aluminium, Glass, Paper and cardboard has highest Mean_EIS
-
+To analyse if Category influence EIS, we first compute the mean EIS of each Category and evaluate / visualise them based using a bar chart.
 ```{R}
 year_state_id
 category <- finalised_waste %>%
-  group_by(Category, Stream) %>%
+  group_by(Category) %>%
   summarise(
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
     SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
@@ -566,51 +604,22 @@ category <- finalised_waste %>%
 
 category
 
-ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS, fill = Stream)) + 
-  geom_col(position = "dodge") +
+ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS)) + 
+  geom_col(fill = "steelblue") +
   coord_flip() +
   labs(
     title = "Mean EIS by Category",
     x = "Category",
-    y = "Mean EIS",
-    fill = "Stream"
-  ) +
-  theme_minimal()
-
-```
-
-### Is Type a factor?
-
-```{R}
-type <- finalised_waste %>%
-  group_by(Type) %>%
-  summarise(
-    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
-    SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
-    Total_Count = n()
-) %>% arrange(Mean_EIS)
-
-type
-
-ggplot(type, aes(x = reorder(Type, Mean_EIS), y = Mean_EIS)) + 
-  geom_col() +
-  labs(
-    title = "Mean EIS by Type",
-    x = "Type",
     y = "Mean EIS"
   ) +
   theme_minimal()
 
 ```
-
-### Is Category or Fate more influential over EIS?
-
-```{R}
-
-```
+We observed that Organics has lowest Mean_EIS whereas Metals has highest Mean_EIS. 
+This implies that xxxxxxxxxxxxxxxxxxxxxxxx.
 
 ### Is Stream a factor?
-
+To analyse if Stream influence EIS, we will observe how the 3 types of Stream differs in mean, standard deviation and total count.
 ```{R}
 stream <- finalised_waste %>%
   group_by(Stream) %>%
@@ -623,7 +632,7 @@ stream <- finalised_waste %>%
 stream
 
 ggplot(stream, aes(x = reorder(Stream, Mean_EIS), y = Mean_EIS)) +
-  geom_col() +
+  geom_col(fill = "steelblue") +
   coord_flip() +
   labs(
     title = "Mean EIS by Stream",
@@ -632,10 +641,24 @@ ggplot(stream, aes(x = reorder(Stream, Mean_EIS), y = Mean_EIS)) +
   ) +
   theme_minimal()
 ```
+It is observed that their Mean_EIS is very closed to one another. A better way to determine Stream influence on EIS is to observe each Stream distribution across EIS using a violin plot.
+```{R}
+ggplot(finalised_waste, aes(x = reorder(Stream, Env_Impact_Score, median), y = Env_Impact_Score)) +
+  geom_violin(fill = "steelblue", alpha = 0.6) +
+  geom_boxplot(width = 0.1, fill = "white") +
+  coord_flip() +
+  labs(
+    title = "Distribution of Env Impact Score by Stream",
+    x = "Stream",
+    y = "Env Impact Score"
+  ) +
+  theme_minimal()
+```
+Here, observe that majority of MSW waste receive EIS of 5 as observed the density is heavier at the range of EIS = 5. C&I is distributed across EIS of 3, 5, 6 and 8 almost uniformly, with not a specific EIS biased. C&D has majority distribution of EIS = 5 and 6.
+This implies that xxxxxxxxxxxxxxxxxxxx.
 
 ### Is Fate a factor?
-
-Observation: - Disposal has lowest Mean_EIS - Recycling has highest Mean_EIS
+To analyse if Fate influence EIS, we will observe how the 5 types of Fate differs in mean, standard deviation and total count.
 
 ```{R}
 fate <- finalised_waste %>%
@@ -647,19 +670,23 @@ fate <- finalised_waste %>%
 ) %>% arrange(Mean_EIS)
 
 fate
+```
+It is observed that Fate of "Energy recovery", "Long-term storage" and "Waste reuse" has standard deviation of 0, meaning all data points in these set are identical. This indicates that
 
-finalised_waste %>% group_by(Fate, Env_Impact_Score) %>% summarise(Total = sum(Env_Impact_Score)) %>% ungroup() %>% arrange(Env_Impact_Score)
-
-ggplot(fate, aes(x = reorder(Fate, Mean_EIS), y = Mean_EIS)) +
-  geom_col() +
+```{R}
+ggplot(finalised_waste, aes(x = Fate, y = Env_Impact_Score)) +
+  geom_jitter(alpha = 0.05, width = 0.3, height = 0.2, color = "steelblue") +
+  stat_summary(fun = mean, geom = "point", size = 4, color = "darkred") +
   coord_flip() +
   labs(
-    title = "Mean EIS by Fate",
-    x = "Fate",
-    y = "Mean EIS"
+    title = "Env Impact Score by Fate (individual cases + mean)",
+    x = "Stream",
+    y = "Env Impact Score"
   ) +
   theme_minimal()
 ```
+Here observe that xxxxxxxxxxxxxxx.
+This implies that xxxxxxxxxxxxxxx.
 
 ### Is Core_Non-core a factor?
 
@@ -671,93 +698,60 @@ core_non_core <- finalised_waste %>%
   summarise(
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
     SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
-    Total_Count = n()
+    Total_Count = n(),
+    Min = min(Env_Impact_Score, na.rm = TRUE),
+    First_Quartile = quantile(Env_Impact_Score, 0.25, na.rm = TRUE),
+    Median = median(Env_Impact_Score, na.rm = TRUE),
+    Third_Quartile = quantile(Env_Impact_Score, 0.75, na.rm = TRUE),
+    Max = max(Env_Impact_Score, na.rm = TRUE),
+    Mean = mean(Env_Impact_Score)
 ) %>% arrange(Mean_EIS)
 
 core_non_core
 
-```
-
-### State and Env_Impact_Score across the years
-
-```{R}
-state_score_summary <- finalised_waste %>%
-  left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
-  mutate(
-    State = str_to_upper(State),
-    Year = as.numeric(str_extract(Year, "^\\d{4}"))
-  ) %>%
-  group_by(Year, State) %>%
-  summarise(
-    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
-    n = n(),
-  ) %>%
-  ungroup() %>%
-  arrange(Year)
-
-state_score_summary
-
-ggplot(state_score_summary, aes(x = Year, y = Mean_EIS, color = State)) + 
-  geom_line(linewidth = 1) +
-  geom_point() + 
-  facet_wrap(~ State) +
+ggplot(finalised_waste, aes(x = `Core_Non-core`, y = Env_Impact_Score)) +
+  geom_boxplot(fill = "steelblue") +
   labs(
-    title = "Yearly Trend of Mean_EIS Tonnes by State",
-    x = "Year",
-    y = "Mean_EIS",
-    color = "State"
+    title = "Env Impact Score by Core/Non-core Waste",
+    x = "Core_Non-core",
+    y = "Env Impact Score"
   ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "none" 
-    )
-```
+  theme_minimal()
 
-### State and Economic Growth across the years
-
-```{R}
-year_econ <- year_state_id %>% 
-  mutate(
-    State = str_to_upper(State),
-    Year = as.numeric(str_extract(Year, "^\\d{4}"))
-  ) %>% 
-  filter(State != "AUSTRALIA") %>%
-  arrange(Year)
-
-year_econ
-
-ggplot(year_econ, aes(x = Year, y = Economic_Growth, color = State)) + 
-  geom_line(linewidth = 1) +
-  geom_point() + 
-  facet_wrap(~ State) +
+ggplot(finalised_waste, aes(x = as.factor(Env_Impact_Score))) +
+  geom_bar(fill = "steelblue") +
+  facet_wrap(~ `Core_Non-core`) +
   labs(
-    title = "Economic Growth over Years by State",
-    x = "Year",
-    y = "Economic Growth",
-    color = "State"
+    title = "EIS Distribution by Core/Non-core Waste",
+    x = "Environmental Impact Score",
+    y = "Count"
   ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    legend.position = "none" 
-    )
+  theme_minimal()
+
 ```
 
-### State, Economic_Growth and Env_Impact_Score across the years
 
+
+### How does EIS changes in each State and economic growth across the years?
+To analyse, we first create a new state_econ_score_summary table that computes the Mean_EIS, grouped by state and year. This is done by joining the 2 tables -- finalised_waste and year_state_id by Year_State_ID ad ID.
 ```{R}
 state_econ_score_summary <- finalised_waste %>%
+  # joining 2 tables
   left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
   mutate(
+    # upper State name for consistency
     State = str_to_upper(State),
+    # extract first 4 digits as Year
     Year = as.numeric(str_extract(Year, "^\\d{4}"))
   ) %>%
   group_by(Year, State, Economic_Growth) %>%
   summarise(
+    # mean EIS by state and year
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
     n = n()
   ) %>%
+  # remove "AUSTRALIA" invalid state value
+  filter(State != "AUSTRALIA") %>%
   ungroup() %>%
   arrange(Year)
 
@@ -772,7 +766,10 @@ state_econ_long <- state_econ_score_summary %>%
   )
 
 state_econ_long
+```
 
+Now, we can plot a line-graph containing Economic_Growth over years and Mean_EIS over year for each state. 
+```{R}
 ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
   geom_line(linewidth = 1) +
   geom_point() + 
@@ -788,6 +785,7 @@ ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
     legend.position = "none"
   )
 ```
+Here, we observed that the trend of economic growth and mean EIS across the year for every state follows a similar trend, which is as economic growth increases, mean EIS decrease. This implies that xxxxxxxxxxxxxxxx.
 
 ## 8.
 
