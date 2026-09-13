@@ -1,11 +1,11 @@
 ---
 title: "assignment2"
+author: Lim Excelyynx (34476245)
 output: pdf_document
 date: "2026-08-25"
 ---
 
 # Assignment 2
-Lim Excelyynx (34476245)
 
 ### Load tidyverse
 ```{R}
