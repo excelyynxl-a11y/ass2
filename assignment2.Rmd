@@ -23,34 +23,29 @@ year_state_id <- read_csv("data/Year_State_ID.csv")
 year_state_id
 ```
 
-## Handling missing value
+## Determining how to handling missing value
 
 Prior to conducting analysis, I will handle missing values by first observing how many entries will be cleared off if I simply drop all missing value.
 
 ```{R}
-total_raw_entries <- waste %>% nrow()
-total_raw_entries
-
 missing_entries <- waste %>% 
   filter(if_any(everything(), is.na))
-
-missing_entries
-
-percentage_missing_entries <- (missing_entries / total_raw_entries) * 100
-
-percentage_missing_entries
+missing_entries 
 ```
 
-I will handle missing value by dropping them because data is missing completely at random, only constitute less than 1% of all entries and sample is large enough that losing few rows will not effect analysis by too much.
+The NA values observed:
+
+1. A row of Category = "Space debris" has several NA values across Case_ID, Year_State_ID, Stream, Fate, Tonnes, Core_Non-core and Description. Hence, the suitable approach is to drop this case.
 
 ```{R}
 waste_drop <- waste %>%
-  drop_na()
+  filter(is.na(Category) | Category != "Space debris")
 
-waste_drop
+waste_drop %>% 
+  filter(if_any(everything(), is.na))
 ```
 
-The waste_drop data will be used for all task.
+2. The rest only has one variable with NA value. The NAs are small in number and located in few cases and variables. Hence, the suitable approach is to impute these values by replacing with appropriate values by doing analysis and observation as we move on to each task.
 
 ## Q1. Number of unique "Category" values in Wastes.csv
 
