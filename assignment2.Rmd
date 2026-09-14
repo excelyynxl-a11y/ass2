@@ -387,7 +387,6 @@ Statistical information for total waste tonnes of each state in temp = `r temp_s
 To format the year from, for example: "2020-2021" to "2020", a new year_formatted table is created by left-joining finalised_waste with year_state_id. Year is extracted by concatenating the first 4 digit from original Year column.
 
 ```{R}
-year_state_id
 year_formatted <- finalised_waste %>%
   left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
   mutate(State = str_to_upper(State)) %>%
@@ -787,8 +786,16 @@ ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
 ```
 Here, we observed that the trend of economic growth and mean EIS across the year for every state follows a similar trend, which is as economic growth increases, mean EIS decrease. This implies that xxxxxxxxxxxxxxxx.
 
-## 8.
+## Q8. Disposal size variation and disposal frequency of each state
 
+To decide on tonnes range, we first observe the details on tonnes.
 ```{R}
+finalised_waste
+finalised_waste %>% select(Tonnes) %>% arrange()
 
+tonnes_summary <- finalised_waste %>%
+  summarise(
+    Min = 
+      
+  )
 ```
