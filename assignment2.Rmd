@@ -35,7 +35,7 @@ missing_entries
 
 The NA values observed:
 
-1. A row of Category = "Space debris" has several NA values across Case_ID, Year_State_ID, Stream, Fate, Tonnes, Core_Non-core and Description. Hence, the suitable approach is to drop this case.
+1.  A row of Category = "Space debris" has several NA values across Case_ID, Year_State_ID, Stream, Fate, Tonnes, Core_Non-core and Description. Hence, the suitable approach is to drop this case.
 
 ```{R}
 waste_drop <- waste %>%
@@ -45,7 +45,7 @@ waste_drop %>%
   filter(if_any(everything(), is.na))
 ```
 
-2. The rest only has one variable with NA value. The NAs are small in number and located in few cases and variables. Hence, the suitable approach is to impute these values by replacing with appropriate values by doing analysis and observation as we move on to each task.
+2.  The rest only has one variable with NA value. The NAs are small in number and located in few cases and variables. Hence, the suitable approach is to impute these values by replacing with appropriate values by doing analysis and observation as we move on to each task.
 
 ## Q1. Number of unique "Category" values in Wastes.csv
 
@@ -86,16 +86,10 @@ waste_drop %>%
   )
 ```
 
-Some concerning Category are observed: 
-1. "Building & demolition materials" and "Building and demolition materials" is the same Category but naming unconsistency. 
-2. "Hazardous wastes" and "HW" is the same Category but naming unconsistency. 
-3. "Plastic" and "Plastics" is the same Category but naming unconsistency. 4. "organics" and "Organics" is the same Category but naming unconsistency. 
-5. "Aluminium" is a Type, not Category. Should be replaced with "Metals" 6. "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics". 
-7. "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency. 
-8. "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
+Some concerning Category are observed: 1. "Building & demolition materials" and "Building and demolition materials" is the same Category but naming unconsistency. 2. "Hazardous wastes" and "HW" is the same Category but naming unconsistency. 3. "Plastic" and "Plastics" is the same Category but naming unconsistency. 4. "organics" and "Organics" is the same Category but naming unconsistency. 5. "Aluminium" is a Type, not Category. Should be replaced with "Metals" 6. "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics". 7. "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency. 8. "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
 
-Some concerning NA Category are further analyse to determine a suitable replacement. We can create a na_category_type table to infer waste of similar Type has what kind of category.
-This is done by joining na_category_type and waste_drop table.
+Some concerning NA Category are further analyse to determine a suitable replacement. We can create a na_category_type table to infer waste of similar Type has what kind of category. This is done by joining na_category_type and waste_drop table.
+
 ```{R}
 na_category_type <- waste_drop %>% 
   filter(
@@ -109,8 +103,8 @@ waste %>% semi_join(
   by = "Type"
 ) %>% select(Category, Type)
 ```
-It is observed that the NA Category values with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)" belongs to Category of "Hazardous wastes", informing us:
-9. NA entry with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)", which is suitable to be replaced with "Hazardous wastes".
+
+It is observed that the NA Category values with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)" belongs to Category of "Hazardous wastes", informing us: 9. NA entry with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)", which is suitable to be replaced with "Hazardous wastes".
 
 Now, values of Category column will be updated using recode() and case_when() accordingly.
 
@@ -210,6 +204,7 @@ number_negative_env_impact_score
 ```
 
 ### Q2 Final Answer
+
 Total negative feedback comments in "Description" with environmental impact score of 2 or 3 = `r number_negative_env_impact_score`
 
 ## Q3. Calculate the fractions of waste tonnes of different waste sources, draw a chart to visualize the fraction numbers specific to the Category value
@@ -377,8 +372,8 @@ temp_state_summary
 ```
 
 ### Q4 Final Answer
-temp dataset = `r temp`
-Statistical information for total waste tonnes of each state in temp = `r temp_state_summary`
+
+temp dataset = `r temp` Statistical information for total waste tonnes of each state in temp = `r temp_state_summary`
 
 ## Q5. Yearly trend of total waste tonnes of food organics for each state
 
@@ -535,7 +530,6 @@ most_incremented_waste_type <- yearly_waste_type %>%
 most_incremented_waste_type  
 ```
 
-
 ## Q7. Investigate the factors influencing environmental impact scores (EIS)
 
 To analyse the factors influencing EIS, I will be using the previous finalise_waste dataset containing all required information combined from Waste.csv and Year_State_ID.csv
@@ -545,14 +539,17 @@ glimpse(finalised_waste)
 ```
 
 ### Environmental Impact Score distribution
+
 Firstly, we need to identify EIS is continuous or discrete.
+
 ```{R}
 finalised_waste %>% 
   distinct(Env_Impact_Score) %>% 
   arrange(Env_Impact_Score)
 ```
-Here, we observed the valid EIS found in in dataset are 1, 2, 3, 4, 5, 6, 8 -- indicating EIS is discrete.
-When we visualise EIS distribution using a bar-chart, we can clearly observe EIS is categorical rather than continuous.
+
+Here, we observed the valid EIS found in in dataset are 1, 2, 3, 4, 5, 6, 8 -- indicating EIS is discrete. When we visualise EIS distribution using a bar-chart, we can clearly observe EIS is categorical rather than continuous.
+
 ```{R}
 ggplot(finalised_waste, aes(x = Env_Impact_Score)) + 
   geom_bar(fill = "steelblue") + 
@@ -563,7 +560,6 @@ ggplot(finalised_waste, aes(x = Env_Impact_Score)) +
   ) +
   theme_minimal()
 ```
-
 
 ```{R}
 conti_table_eis_category <- table(year_formatted$Env_Impact_Score, year_formatted$Category)
@@ -590,7 +586,9 @@ chisq.test(conti_table_eis_core_non)
 ```
 
 ### Is category a factor?
-To analyse if Category influence EIS, we first compute the mean EIS of each Category and evaluate / visualise them based using a bar chart.
+
+To analyse if Category influence EIS, we first compute the mean EIS of each Category.
+
 ```{R}
 year_state_id
 category <- finalised_waste %>%
@@ -602,7 +600,10 @@ category <- finalised_waste %>%
 ) %>% arrange(Mean_EIS)
 
 category
+```
 
+We visualise them using a horizontal bar chart with horizontal-axis as Mean_EIS and vertical-axis as category.
+```{R}
 ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS)) + 
   geom_col(fill = "steelblue") +
   coord_flip() +
@@ -614,10 +615,14 @@ ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS)) +
   theme_minimal()
 
 ```
-We observed that Organics has lowest Mean_EIS whereas Metals has highest Mean_EIS. 
-This implies that xxxxxxxxxxxxxxxxxxxxxxxx.
+We observed that:
+1. Organics has lowest Mean_EIS 
+2. Metals has highest Mean_EIS. 
+
+This implies that xxxxxxxxxxxxxxxxxxxxxxxxxxxx.
 
 ### Is Stream a factor?
+
 To analyse if Stream influence EIS, we will observe how the 3 types of Stream differs in mean, standard deviation and total count.
 ```{R}
 stream <- finalised_waste %>%
@@ -629,18 +634,11 @@ stream <- finalised_waste %>%
 ) %>% arrange(Mean_EIS)
 
 stream
-
-ggplot(stream, aes(x = reorder(Stream, Mean_EIS), y = Mean_EIS)) +
-  geom_col(fill = "steelblue") +
-  coord_flip() +
-  labs(
-    title = "Mean EIS by Stream",
-    x = "Stream",
-    y = "Mean EIS"
-  ) +
-  theme_minimal()
 ```
-It is observed that their Mean_EIS is very closed to one another. A better way to determine Stream influence on EIS is to observe each Stream distribution across EIS using a violin plot.
+
+It is observed that their Mean_EIS is very closed to one another. 
+A better way to determine Stream influence on EIS is to observe each Stream distribution across EIS using a violin plot as it shows similar bimodal shappes across all 3 streams.
+
 ```{R}
 ggplot(finalised_waste, aes(x = reorder(Stream, Env_Impact_Score, median), y = Env_Impact_Score)) +
   geom_violin(fill = "steelblue", alpha = 0.6) +
@@ -653,10 +651,16 @@ ggplot(finalised_waste, aes(x = reorder(Stream, Env_Impact_Score, median), y = E
   ) +
   theme_minimal()
 ```
-Here, observe that majority of MSW waste receive EIS of 5 as observed the density is heavier at the range of EIS = 5. C&I is distributed across EIS of 3, 5, 6 and 8 almost uniformly, with not a specific EIS biased. C&D has majority distribution of EIS = 5 and 6.
+
+Here, observe that:
+1. MSW majority waste receive EIS of 5 as observed the density is heavier at the range of EIS = 5. 
+2. C&I is distributed across EIS of 3, 5, 6 and 8 almost uniformly, with not a specific EIS biased. 
+3. C&D has majority distribution of EIS = 5 and 6. 
+
 This implies that xxxxxxxxxxxxxxxxxxxx.
 
 ### Is Fate a factor?
+
 To analyse if Fate influence EIS, we will observe how the 5 types of Fate differs in mean, standard deviation and total count.
 
 ```{R}
@@ -670,7 +674,8 @@ fate <- finalised_waste %>%
 
 fate
 ```
-It is observed that Fate of "Energy recovery", "Long-term storage" and "Waste reuse" has standard deviation of 0, meaning all data points in these set are identical. This indicates that
+
+It is observed that Fate of "Energy recovery", "Long-term storage" and "Waste reuse" has standard deviation of 0, meaning all data points in these set are identical. This indicates that xxxxxxxxxxxxxxxxxxxxxxxxxx.
 
 ```{R}
 ggplot(finalised_waste, aes(x = Fate, y = Env_Impact_Score)) +
@@ -684,7 +689,12 @@ ggplot(finalised_waste, aes(x = Fate, y = Env_Impact_Score)) +
   ) +
   theme_minimal()
 ```
-Here observe that xxxxxxxxxxxxxxx.
+
+Here observe that:
+1. xxxxxxxxxxxxxxx.
+2. xxxxxxxxxxxxxxx.
+3. xxxxxxxxxxxxxxx. 
+
 This implies that xxxxxxxxxxxxxxx.
 
 ### Is Core_Non-core a factor?
@@ -729,10 +739,10 @@ ggplot(finalised_waste, aes(x = as.factor(Env_Impact_Score))) +
 
 ```
 
-
-
 ### How does EIS changes in each State and economic growth across the years?
+
 To analyse, we first create a new state_econ_score_summary table that computes the Mean_EIS, grouped by state and year. This is done by joining the 2 tables -- finalised_waste and year_state_id by Year_State_ID ad ID.
+
 ```{R}
 state_econ_score_summary <- finalised_waste %>%
   # joining 2 tables
@@ -767,7 +777,8 @@ state_econ_long <- state_econ_score_summary %>%
 state_econ_long
 ```
 
-Now, we can plot a line-graph containing Economic_Growth over years and Mean_EIS over year for each state. 
+Now, we can plot a line-graph containing Economic_Growth over years and Mean_EIS over year for each state.
+
 ```{R}
 ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
   geom_line(linewidth = 1) +
@@ -784,18 +795,107 @@ ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
     legend.position = "none"
   )
 ```
+
 Here, we observed that the trend of economic growth and mean EIS across the year for every state follows a similar trend, which is as economic growth increases, mean EIS decrease. This implies that xxxxxxxxxxxxxxxx.
 
 ## Q8. Disposal size variation and disposal frequency of each state
 
-To decide on tonnes range, we first observe the details on tonnes.
-```{R}
-finalised_waste
-finalised_waste %>% select(Tonnes) %>% arrange()
+First, we observe waste entries with Type of "Tyres (T140)" and Fate of "Disposal". We need to observe the number of entries and Tonnes values to determine a suitable tonnes_range afterwards.
 
-tonnes_summary <- finalised_waste %>%
-  summarise(
-    Min = 
-      
+```{R}
+tyre_disposal <- year_formatted %>% 
+  filter(
+    Type == "Tyres (T140)",
+    Fate == "Disposal"
+  ) %>%
+  arrange()
+
+tyre_disposal %>% select(Type, Fate, Tonnes)
+```
+
+Now, we check the summary of Tonnes column (min, q1, median, q3, max)
+
+```{R}
+summary(tyre_disposal$Tonnes)
+```
+
+We observe that up to the third quatile, Tonnes value is still 0. This means the data is heavily right skewed. Hence, we need to include a zero range. However, we are not dropping zero tonnes values as it can be informative in telling the disposal activity here is negligible. If we drop them, 2 states can end up looking identical in frequency count of "real" disposal event.
+
+Due to the skewness of Tonnes value, it is more suitable to create non-uniform range over a uniform range from 0 to max tonnes. To decide on range, we first observe some sensible breakpoints:
+
+```{R}
+tyre_disposal %>%
+  filter(Tonnes > 0) %>%
+  pull(Tonnes) %>%
+  quantile(probs = c(
+    0, 
+    0.25, 
+    0.5, 
+    0.75, 
+    0.9, 
+    0.95, 
+    1
+  ))
+```
+
+Now, we can decide on Tonnes_ranges with values: 1. 0 (none disposed) 2. 0-500 3.500-5000 4.5000-20000 5.20000+
+
+We update the tyre_disposal table by mutating a new Tonnes_range column and apply case_when to determine each waste Tonnes_range category.
+
+```{R}
+tyre_disposal <- tyre_disposal %>%
+  mutate(
+    Tonnes_range = case_when(
+      Tonnes == 0 ~ "0 (none disposed)",
+      Tonnes > 0  & Tonnes <= 500 ~ "0-500",
+      Tonnes > 500 & Tonnes <= 5000 ~ "500-5000",
+      Tonnes > 5000 & Tonnes <= 20000 ~ "5000-20000",
+      Tonnes > 20000 ~ "20000+"
+    )
   )
+
+tyre_disposal
+```
+
+Now that tyre_disposal table has each waste categorised into respective Tonnes_range, we can create a new tonnes_state table that group by each State and Tonnes_range to obtain the frequency of each Tonnes_range by state.
+
+```{R}
+tonnes_state <- tyre_disposal %>%
+  group_by(State, Tonnes_range) %>%
+  summarise(
+    Frequency = n()
+  ) %>%
+  ungroup()
+
+tonnes_state
+```
+
+To visualize the frequency of each Tonnes_range by state, a bar chart is used. A bar chart is used over boxplot or histogram so that manger can compare categorical states against each other on 2 aspect (frequency and tonnes range). Stacking bars show both aspect without requiring manager to read multiple distribution plots per state.
+
+```{R}
+ggplot(tonnes_state, aes(x = reorder(State, Frequency, sum), y = Frequency, fill = Tonnes_range)) +
+  geom_col(position = "stack") +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "0 (none disposed)" = "#FFF7BC", # light shade for less significant ) disposal
+    "0-500"             = "#FEE391",
+    "500-5000"         = "#FEC44F",
+    "5000-20000"      = "#D95F0E",
+    "20000+"           = "#993404" # darker shade to highlight highest tonnes range
+  )) +
+  labs(
+    title = "Tyre Disposal Frequency and Size Distribution by State",
+    x = "State",
+    y = "Number of Disposal Cases",
+    fill = "Tonnes Range"
+  ) +
+  theme_minimal()
+```
+
+From the bar chart, it inform the manager: 1. State with bar dominated by darker shade (eg: 20000+) are great state for investing in large-scale processing capacity. 2. State with higher frequency mostly in lighter shades (eg: 0, 0-500) suggest many small disposal event, justifying it is not suitable for large infrastructure investment in these states. 3. For instance, VIC, NSW and QLD are best to invest for large-scale tyres processing capacity due to higher frequency of disposal event happening at range of 20000+.
+
+## Q9 Factor influencing yearly trend of total C&D waste tonnes.
+
+```{R}
+
 ```
