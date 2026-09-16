@@ -86,7 +86,15 @@ waste_drop %>%
   )
 ```
 
-Some concerning Category are observed: 1. "Building & demolition materials" and "Building and demolition materials" is the same Category but naming unconsistency. 2. "Hazardous wastes" and "HW" is the same Category but naming unconsistency. 3. "Plastic" and "Plastics" is the same Category but naming unconsistency. 4. "organics" and "Organics" is the same Category but naming unconsistency. 5. "Aluminium" is a Type, not Category. Should be replaced with "Metals" 6. "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics". 7. "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency. 8. "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
+Some concerning Category are observed: 
+1. "Building & demolition materials" and "Building and demolition materials" is the same Category but naming unconsistency. 
+2. "Hazardous wastes" and "HW" is the same Category but naming unconsistency. 
+3. "Plastic" and "Plastics" is the same Category but naming unconsistency.
+4. "organics" and "Organics" is the same Category but naming unconsistency. 
+5. "Aluminium" is a Type, not Category. Should be replaced with "Metals"
+6. "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics". 
+7. "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency. 
+8. "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
 
 Some concerning NA Category are further analyse to determine a suitable replacement. We can create a na_category_type table to infer waste of similar Type has what kind of category. This is done by joining na_category_type and waste_drop table.
 
@@ -162,7 +170,7 @@ number_unique_wastes_category
 
 ### Q1 Final Answer
 
-Total unique "Category" values = `r number_unique_wastes_category`
+Total unique "Category" values is **11**.
 
 ## Q2. Number of negative feedback comments in the 'Description' column with an environmental impact score of 2 or 3
 
@@ -205,24 +213,23 @@ number_negative_env_impact_score
 
 ### Q2 Final Answer
 
-Total negative feedback comments in "Description" with environmental impact score of 2 or 3 = `r number_negative_env_impact_score`
+Total negative feedback comments in "Description" with environmental impact score of 2 or 3 is **6312**
 
 ## Q3. Calculate the fractions of waste tonnes of different waste sources, draw a chart to visualize the fraction numbers specific to the Category value
 
-Observe Stream column
-
+### Clean Stream column:
+Observe Stream column.
 ```{R}
 waste_unique %>% 
   select(Stream) %>%
   distinct(Stream)
 ```
 
-### Clean Stream column:
+We observed from the Stream column contain duplicated values for the same Stream: 
+1. "Construction and demolition waste" should be standardized to "C&I" 
+2. "Municipal solid waste" should be standardized to "MSW"
 
-We observed from the Stream column: 1. "Construction and demolition waste" should be "C&I" 2. "Municipal solid waste" should be "MSW"
-
-For consistency, all Stream values will be replace to only 3 options: C&I, C&D, MSW using recode.
-
+We will standardized them accordingly to specification: all Stream values will be replace to only 3 options: C&I, C&D, MSW using recode(). This ensure same waste are being treated as the same stream group when calculating fraction later.
 ```{R}
 waste_unique <- waste_unique %>%
   mutate(
@@ -230,64 +237,75 @@ waste_unique <- waste_unique %>%
       Stream,
       "Construction and demolition waste" = "C&D",
       "Municipal solid waste" = "MSW",
-      
     )
   )
 ```
 
-Observe new unique Stream
-
+Observe new unique Stream.
 ```{R}
 waste_unique %>% 
   select(Stream) %>%
   distinct(Stream)
 ```
-
-Observe Tonnes column
-
-```{R}
-waste_unique %>% 
-  select(Tonnes, Description) %>%
-  arrange(Tonnes)
-```
+Now, Stream is standardized to only 3 valid Stream value.
 
 ### Clean Tonnes column
-
-We observed Tonnes column contain non-sensible values: 1. Negative values
-
-To decide on how to handle the non-sensible Tonnes value, we will start by observing how much non-sensible Tonnes value constitute in overall dataset.
-
+Observe any NA Tonnes values.
 ```{R}
-total_entries <- waste_unique %>% nrow()
-total_entries
-
-non_sensible_tonnes_entries <- waste_unique %>% filter(Tonnes < 0) %>% nrow()
-non_sensible_tonnes_entries
-
-percentage_non_sensi <- (non_sensible_tonnes_entries / total_entries) * 100
-
-percentage_non_sensi
+waste_unique %>% 
+  filter(is.na(Tonnes)) %>%
+  select(Case_ID, Tonnes, Description)
+```
+We inspect the NA tonnes count and percentage of how much these NA values constitute to overall dataset using summary().
+```{R}
+# calculate na_tonnes_count and na_percentage
+waste_unique %>%
+  summarise(
+    na_tonnes_count = sum(is.na(Tonnes)),
+    na_percentage = mean(is.na(Tonnes)) * 100
+  )
 ```
 
-I will drop off the non-sensible Tonnes values because it constitute only less than 1% of original waste_unique dataset.
+Values with NA tonnes will simply be dropped off since it makes up a small proportion (0.038%) of the dataset.
+```{R}
+waste_unique <- waste_unique %>%
+  filter(!is.na(Tonnes))
+```
+
+Observe any negative Tonnes values.
+```{R}
+waste_unique %>% 
+  select(Case_ID, Tonnes, Description) %>%
+  filter(Tonnes < 0)
+```
+
+We observed there are 6 values with negative Tonnes values. We need to clean these inputs by observing their respective Description. We observe that:
+1. Case_ID of 34666 has a mention of "141663.39 tonnes" in Description. This value should be imputed with 141663.39 tonnes.
+2. The others have a mention of "-0.00 tonnes" in Description. These values should be imputed with 0 tonnes.
+
+We can use these observation to impute and replace each negative value using case_when().
 
 ```{R}
-# filter to remove negative Tonnes values
-waste_tonnes_filtered <- waste_unique %>%
-  mutate(Tonnes = as.numeric(Tonnes)) %>%
-  filter(Tonnes >= 0)
-
-waste_tonnes_filtered %>% 
-  select(Tonnes) %>% 
-  arrange(Tonnes)
+# replace negative Tonnes values
+waste_unique <- waste_unique %>%
+  mutate(
+    Tonnes = case_when(
+      Case_ID == 34666 ~ 141663.39,
+      Tonnes < 0 ~ 0,
+      TRUE ~ Tonnes 
+    )
+  )
 ```
 
 ### Calculate waste fraction
 
-To calculate waste fraction, a new waste_fraction table is created by grouping waste_tonnes_filtered by Category and Stream. Stream_Tonnes is then obtained by summing Tonnes in each group. Category_Total is sum of Stream_Tonnes. Fraction is Stream_Tonnes / Category_Total
+To calculate waste fraction, a new waste_fraction table is created by grouping waste_unique by Category and Stream. 
+Stream_Tonnes is then obtained by summing Tonnes in each group.
+Category_Total is sum of Stream_Tonnes. 
+Fraction is Stream_Tonnes / Category_Total
 
 ```{R}
-waste_fraction <- waste_tonnes_filtered %>%
+waste_fraction <- waste_unique %>%
   group_by(Category, Stream) %>%
   summarise(Stream_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
   group_by(Category) %>%
@@ -295,85 +313,98 @@ waste_fraction <- waste_tonnes_filtered %>%
     Category_Total = sum(Stream_Tonnes),
     Fraction = Stream_Tonnes / Category_Total
   ) %>%
-  ungroup()
-
-waste_fraction
+  ungroup() %>%
+  mutate(
+    Category = factor(
+      Category,
+      levels = sort(unique(Category))
+    )
+  )
 ```
 
 ### Draw chart visualizing the fraction numbers specific to the Category value
 
-To visualise the fraction number specific to category value, I created a stacked bar plot where x-axis represent Category and y-axis represent Fraction of Tonnes, with colour of bar to distinguish each Stream.
+To visualize the fraction number specific to category value, a stacked bar chart with x-axis represent Category and y-axis represent Fraction of Tonnes, and color of bars to distinguish each Stream. A bar chart is suitable because Category and Stream and categorical variable, whereas the fraction are proportions that sums to 100% within each Category. The fraction of waste is comparable across all waste Category.
 
 ```{R}
 ggplot(
-  waste_fraction, 
+  waste_fraction,
   aes(x = Category, y = Fraction, fill = Stream)) +
-  geom_bar(stat = "identity", position = "fill") +
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(
+    labels = scales::percent_format(),
+    limits = c(0, 1)
+  ) +
   labs(
-    title = "Fraction of Waste Tonnes by Source within each Category",
+    title = "Fraction of Waste Tonnes by Source of each Category",
     x = "Category",
     y = "Fraction of Tonnes",
     fill = "Stream"
   ) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
+  theme_minimal()
 ```
+
 
 ## Q4. Add the 'Year' and 'State' values from Year_State_ID.csv to Wastes.csv, compute the total waste tonnes for each year and state, and store the result in a dataset named 'temp', compute and display the statistical information (min, max, mean) of the total waste tonnes for each state in ‘temp’
 
-Introduce a new finalised waste term for clarity
-
+Introduce a new finalized waste term for clarity
 ```{R}
-finalised_waste <- waste_tonnes_filtered
+finalised_waste <- waste_unique
 
 finalised_waste
 ```
 
 ### Left-join year_state_id to finalised_waste.
 
-To combine both year_state_id and finalised_waste dataset to obtain the Year and State attribute, I left joined finalised_waste to year_state_id. State is uppercased for consistency.
+To combine both year_state_id and finalised_waste dataset to obtain the Year and State attribute:
+- left join finalised_waste to year_state_id
+- State is upper-cased for consistency
+- to calculate Tonnes_Waste_Year, Year and State are grouped in order to compute Tonnes_Waste_Year by summing Tonnes of each group
+- odd "AUSTRALIA" is filtered out since it is not a valid state.
 
-To calculate Tonnes_Waste_Year, Year and State are grouped in order to compute Tonnes_Waste_Year by summing Tonnes of each group.
-
-The odd "AUSTRALIA" is filtered out since it is not a valid state.
-
-Resulting temp table has: 1. Year 2. State 3. Total_Waste_Tonnes
+Resulting temp table has: 
+1. Year 
+2. State 
+3. Total_Waste_Tonnes
 
 ```{R}
 temp <- finalised_waste %>%
-  left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
-  select(-Economic_Growth) %>%
-  mutate(State = str_to_upper(State)) %>%
+  left_join(
+    year_state_id, 
+    by = c("Year_State_ID" = "ID")
+  ) %>%
+  mutate(
+    State = str_to_upper(State)
+  ) %>%
   group_by(Year, State) %>%
-  summarise(Total_Waste_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
-  filter(State != "AUSTRALIA")
+  summarise(
+    Total_Waste_Tonnes = sum(Tonnes, na.rm = TRUE)
+  ) %>%
+  filter(State != "AUSTRALIA") %>%
+  ungroup()
 
 temp
 ```
 
-### Summary (min, q1, median, q3, max, mean) of each state
-
-To obtain the summary, statistical metric for Total_Waste_Tonnes is obtained using summary() function. The temp_state_summary has: 1. State 2. Min 3. First_Quartile 4. Median 5. Third_Quartile 6. Max 7. Mean
-
+Reshape temp by making each state as a single column.
 ```{R}
-temp_state_summary <- temp %>%
-  group_by(State) %>%
-  summarise(
-      Min = min(Total_Waste_Tonnes, na.rm = TRUE),
-      First_Quartile = quantile(Total_Waste_Tonnes, 0.25, na.rm = TRUE),
-      Median = median(Total_Waste_Tonnes, na.rm = TRUE),
-      Third_Quartile = quantile(Total_Waste_Tonnes, 0.75, na.rm = TRUE),
-      Max = max(Total_Waste_Tonnes, na.rm = TRUE),
-      Mean = mean(Total_Waste_Tonnes)
-    )
+temp <- temp %>%
+  select(Year, State, Total_Waste_Tonnes) %>%
+  pivot_wider(
+    names_from = State,
+    values_from = Total_Waste_Tonnes
+  )
 
-temp_state_summary
+temp
 ```
 
-### Q4 Final Answer
+### Summary (min, q1, median, mean, q3, max) of each state in single fucntion using summary().
 
-temp dataset = `r temp` Statistical information for total waste tonnes of each state in temp = `r temp_state_summary`
+```{R}
+summary(temp)
+```
+
 
 ## Q5. Yearly trend of total waste tonnes of food organics for each state
 
@@ -796,7 +827,11 @@ ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
   )
 ```
 
-Here, we observed that the trend of economic growth and mean EIS across the year for every state follows a similar trend, which is as economic growth increases, mean EIS decrease. This implies that xxxxxxxxxxxxxxxx.
+Here, we observed that:
+1. Trend of economic growth and mean EIS across the year for every state follows a similar trend.
+2. As economic growth increases, mean EIS decrease. 
+
+This implies that xxxxxxxxxxxxxxxx.
 
 ## Q8. Disposal size variation and disposal frequency of each state
 
