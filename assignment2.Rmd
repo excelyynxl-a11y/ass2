@@ -33,7 +33,9 @@ missing_entries <- waste %>%
 missing_entries 
 ```
 
-The NA values observed: 1. A row of Category "Space debris" has several NA values across Case_ID, Year_State_ID, Stream, Fate, Tonnes, Core_Non-core and Description. Hence, the suitable approach is to drop this case.
+The NA values observed:
+
+1.  A row of Category "Space debris" has several NA values across Case_ID, Year_State_ID, Stream, Fate, Tonnes, Core_Non-core and Description. Hence, the suitable approach is to drop this case.
 
 ```{R}
 # drop entry with Category "Space debris"
@@ -48,6 +50,8 @@ waste_drop %>%
 2.  The remaining 30 entries only has one variable with NA value. The NAs are small in number and located in few cases and variables. Hence, the suitable approach is to impute these values by replacing with appropriate values by doing analysis and observation as we move on to each task.
 
 ## Q1. Number of unique "Category" values in Wastes.csv
+
+### Data Cleaning Category
 
 Observe unique category.
 
@@ -92,7 +96,16 @@ waste_drop %>%
   )
 ```
 
-The concerning Category observed that requires data cleaning action: 1. "Building & demolition materials" and "Building and demolition materials" is the same Category but naming inconsistency. 2. "Hazardous wastes" and "HW" is the same Category but naming inconsistency. 3. "Plastic" and "Plastics" is the same Category but naming inconsistency. 4. "organics" and "Organics" is the same Category but naming inconsistency. 5. "Aluminium" is a Type, not Category. Should be replaced with "Metals" 6. "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics". 7. "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency. 8. "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
+The concerning Category observed that requires data cleaning action:
+
+1.  "Building & demolition materials" and "Building and demolition materials" is the same Category but naming inconsistency.
+2.  "Hazardous wastes" and "HW" is the same Category but naming inconsistency.
+3.  "Plastic" and "Plastics" is the same Category but naming inconsistency.
+4.  "organics" and "Organics" is the same Category but naming inconsistency.
+5.  "Aluminium" is a Type, not Category. Should be replaced with "Metals"
+6.  "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics".
+7.  "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency.
+8.  "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
 
 NA Category are further analyse to determine a suitable replacement. We can create a na_category_type table to infer waste of similar Type has what kind of category. This is done by joining na_category_type and waste_drop table.
 
@@ -157,6 +170,8 @@ waste_unique %>%
   arrange()
 ```
 
+### Count unique Category
+
 To count number of unique waste category, we get the number of rows of unique data from Category column in waste_unique table.
 
 ```{R}
@@ -178,6 +193,8 @@ Total unique "Category" values is **11**.
 
 The current **waste_unique** as a result from Q1 has its Category value without spelling inconsistency, invalid category or NA value.
 
+### Observe Description
+
 Observe the patterns of values of Description column of waste_unique.
 
 ```{R}
@@ -187,6 +204,8 @@ waste_unique %>%
 ```
 
 It is observed that Description values looks like "... Environmental Impact Score: 6/10 ...".
+
+### Extract Environmental Impact Score
 
 To obtain environmental impact score, we extract the value from "value/10" of Description column into a new column called Env_Impact_Score.
 
@@ -224,6 +243,8 @@ Total negative feedback comments in "Description" with environmental impact scor
 
 ## Q3. Calculate the fractions of waste tonnes of different waste sources, draw a chart to visualize the fraction numbers specific to the Category value
 
+### Data Cleaning Stream
+
 Observe Stream column from waste_unique.
 
 ```{R}
@@ -232,7 +253,10 @@ waste_unique %>%
   distinct(Stream)
 ```
 
-We observed from the Stream column contain duplicated values for the same Stream: 1. "Construction and demolition waste" should be standardized to "C&I" 2. "Municipal solid waste" should be standardized to "MSW"
+We observed from the Stream column contain duplicated values for the same Stream:
+
+1.  "Construction and demolition waste" should be standardized to "C&I"
+2.  "Municipal solid waste" should be standardized to "MSW"
 
 We will standardized them accordingly to specification: all Stream values will be replace to only 3 options: C&I, C&D, MSW using recode(). This ensure same waste are being treated as the same stream group when calculating fraction later.
 
@@ -256,6 +280,8 @@ waste_unique %>%
 ```
 
 Now, Stream is standardized to only 3 valid Stream value.
+
+### Data Cleaning Tonnes
 
 Observe any NA Tonnes values from waste_unique.
 
@@ -292,7 +318,10 @@ waste_unique %>%
   filter(Tonnes < 0)
 ```
 
-We observed there are 6 values with negative Tonnes values. We need to clean these inputs by observing their respective Description. We observe that: 1. Case_ID of 34666 has a mention of "141663.39 tonnes" in Description. This value should be imputed with 141663.39 tonnes as the Description has provided an obvious corresponding tonnes value. 2. The others have a mention of "-0.00 tonnes" in Description. These values should be imputed with 0 tonnes as we treat them as numerical error. Keeping "-0.00 tonnes" is misleading and unmeaningful.
+We observed there are 6 values with negative Tonnes values. We need to clean these inputs by observing their respective Description. We observe that:
+
+1.  Case_ID of 34666 has a mention of "141663.39 tonnes" in Description. This value should be imputed with 141663.39 tonnes as the Description has provided an obvious corresponding tonnes value.
+2.  The others have a mention of "-0.00 tonnes" in Description. These values should be imputed with 0 tonnes as we treat them as numerical error. Keeping "-0.00 tonnes" is misleading and unmeaningful.
 
 We will use these observation to impute and replace each negative value using case_when().
 
@@ -307,6 +336,8 @@ waste_unique <- waste_unique %>%
     )
   )
 ```
+
+### Calculating Waste Fraction
 
 To calculate waste fraction, a new waste_fraction table is created by: - grouping waste_unique by Category and Stream - Stream_Tonnes is then obtained by summing Tonnes in each group. - Category_Total is sum of Stream_Tonnes. - Fraction is Stream_Tonnes / Category_Total
 
@@ -327,6 +358,8 @@ waste_fraction <- waste_unique %>%
     )
   )
 ```
+
+### Visualization of Fraction of Waste Tonnes by Source of each Category
 
 To visualize the fraction number specific to category value, a stacked bar chart with x-axis represent Category and y-axis represent Fraction of Tonnes and color of bars to distinguish each Stream. A bar chart is suitable because Category and Stream and categorical variable, whereas the fraction are proportions that sums to 100% within each Category. The fraction of waste is comparable across all waste Category.
 
@@ -350,6 +383,8 @@ ggplot(
 ```
 
 ## Q4. Add the 'Year' and 'State' values from Year_State_ID.csv to Wastes.csv, compute the total waste tonnes for each year and state, and store the result in a dataset named 'temp', compute and display the statistical information (min, max, mean) of the total waste tonnes for each state in ‘temp’
+
+### Data Cleaning Year_State_ID
 
 Inspect the year_state_id unique State values;
 
@@ -395,6 +430,8 @@ year_clean <- year_state_id %>%
 year_clean
 ```
 
+### Joining Year_State_ID.csv and Wastes.csv into temp
+
 To combine both Year_State_ID.csv and Wastes.csv into a waste_year table, left join waste_unique to year_clean. Left-join is used because the main goal is to add Year and State from Year_State_ID.csv into Wastes.csv by Year_State_ID (primary key in Year_State_ID.csv) and ID (foreign key in Wastes.csv), retaining all entries from Wastes.csv
 
 ```{R}
@@ -407,7 +444,11 @@ waste_year <- waste_unique %>%
 waste_year
 ```
 
-Next, we create the new temp table by: - Calculating Tonnes_Waste_Year. Year and State are grouped in order to compute Tonnes_Waste_Year by summarising to to sum Tonnes of each group. - Reshaping waste_year to make each state as a single column.
+Next, we create the new temp table by:
+
+- Calculating Tonnes_Waste_Year. Year and State are grouped in order to compute Tonnes_Waste_Year by summarizing to to sum Tonnes of each group.
+
+- Reshaping waste_year to make each state as a single column.
 
 ```{R}
 temp <- waste_year %>%
@@ -424,6 +465,8 @@ temp <- waste_year %>%
 temp
 ```
 
+### Summary for temp
+
 State the summary (min, q1, median, mean, q3, max) of each state in single function using summary().
 
 ```{R}
@@ -432,7 +475,7 @@ summary(temp)
 
 ## Q5. Yearly trend of total waste tonnes of food organics for each state
 
-### Format year
+### Format Year
 
 To format the year from, for example: "2020-2021" to "2020", a new waste_year_formatted table is from year_waste in Q4. Year is extracted by extracting the first 4 digit from original Year column. This ensures waste_year_formatted table can be used for remaining task, including visualization of yearly trend of total waste tonnes of food organics for each state later.
 
@@ -513,7 +556,7 @@ fate_recycling
 
 ### Sum per year of each waste type with recycling as Fate
 
-To obtain Recycled_Tonnes, fate_recycling table is grouped by Type and Year, then obtained by summing each group Tonnes values. The recycled_waste_type table has: 1. Type 2. Year 3. Recycled_Tonnes
+To obtain Recycled_Tonnes, fate_recycling table is grouped by Type and Year, then obtained by summing each group Tonnes values.
 
 ```{R}
 recycled_waste_type <- fate_recycling %>%
@@ -550,7 +593,7 @@ fate_energy_recovery
 
 ### Sum per year of each waste type with energy-recovered as Fate
 
-To obtain Energy_Recovered_Tonnes, fate_energy_recovered table is grouped by Type and Year, then obtained by summing each group Tonnes values. The energy_recovered_waste_type table has: 1. Type 2. Year 3. Energy_Recovered_Tonnes
+To obtain Energy_Recovered_Tonnes, fate_energy_recovered table is grouped by Type and Year, then obtained by summing each group Tonnes values.
 
 ```{R}
 energy_recovered_waste_type <- fate_energy_recovery %>%
@@ -597,7 +640,13 @@ first_last_waste_type
 
 Create a new start_end_waste_type from waste_year_formatted where only waste types with Type from first_last_waste_type and Year with 2006 and 2016.
 
-Create new waste_type_increase from start_end_waste_type to have fields for: - Total_Tonnes = sum of Tonnes from 2006 to 2020 - Start_Tonnes = Tonnes from year 2006 - End_Tonnes = Tonnes from year 2020 - Change = End_Tonnes - Start_Tonnes
+Create new waste_type_increase from start_end_waste_type to have fields for:
+
+- Total_Tonnes = sum of Tonnes from 2006 to 2020
+
+- Start_Tonnes = Tonnes from year 2006 - End_Tonnes = Tonnes from year 2020
+
+- Change = End_Tonnes - Start_Tonnes
 
 ```{R}
 waste_type_start_end <- waste_year_formatted %>%
@@ -625,6 +674,7 @@ waste_type_start_end
 ### Most incremented waste type
 
 To obtain the most incremented waste_type, filter all row to obtain Change that equates to highest changes value of the column.
+
 ```{R}
 most_incremented_waste_type <- waste_type_start_end %>%
   filter(Change == max(Change))
@@ -633,6 +683,7 @@ most_incremented_waste_type
 ```
 
 ### Q6 Final Answer
+
 The most incremented waste type over year is **Bricks, concrete and pavers** with an increase of **8345529** Tonnes.
 
 ## Q7. Investigate the factors influencing environmental impact scores (EIS)
