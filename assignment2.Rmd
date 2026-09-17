@@ -402,17 +402,17 @@ year_state_id %>% distinct(Year)
 
 We observe that some Year are invalid financial year (eg: 2005-2011, 2005-2012, 2005-2013) as mentioned in the brief, a valid financial Year should look like 2006-2007 and 2020-2021.
 
-We will create a new year_clean table that: 1. upper-cased State for consistency 2. remove the odd "AUSTRALIA" State 3. remove invalid financial year by separating Year into start and end, the filter only cases where end - start == 1.
+We will create a new year_clean table that:
+
+1.  Upper-cased State for consistency.
+2.  Remove invalid financial year by separating Year into start and end.
+3.  Filter only cases where end - start == 1.
 
 ```{R}
 year_clean <- year_state_id %>%
   # uppercase State
   mutate(
     State = str_to_upper(State)
-  ) %>%
-  # remove "Australia"
-  filter(
-    State != "AUSTRALIA"
   ) %>%
   separate(
     Year,
@@ -440,6 +440,15 @@ waste_year <- waste_unique %>%
     year_clean, 
     by = c("Year_State_ID" = "ID")
   )
+
+waste_year
+```
+
+After joining, we filter to remove the invalid AUSTRALIA state.
+
+```{R}
+waste_year <- waste_year %>% 
+  filter(State != "AUSTRALIA")
 
 waste_year
 ```
@@ -688,7 +697,37 @@ The most incremented waste type over year is **Bricks, concrete and pavers** wit
 
 ## Q7. Investigate the factors influencing environmental impact scores (EIS)
 
-The waste_year_formatted table contain all join data from Wastes.csv and Year_State_ID.csv, with Year representing the start year (eg: 2020 from 2020-2021)
+The waste_year_formatted table contain all join data from Wastes.csv and Year_State_ID.csv, with
+
+### Data Cleaning Core_Non-core
+
+Year representing the start year (eg: 2020 from 2020-2021). The Core_Non-core column is still unclean up to this point.
+
+Observe NA Core_Non-core value.
+
+```{R}
+waste_year_formatted %>% filter(is.na(`Core_Non-core`))
+```
+
+Based on the brief, a core waste comprise of "hazardous waste". As observed, all entries with NA as Core_Non-core are of Category of "Hazardous waste". Hence, we can impute these entries with "Core waste" as the Core_Non-core value.
+
+```{R}
+waste_year_formatted <- waste_year_formatted %>%
+  mutate(
+    `Core_Non-core` = case_when(
+      is.na(`Core_Non-core`) & Category == "Hazardous wastes" ~ "Non-core waste",
+      TRUE ~ `Core_Non-core`
+    )
+  )
+```
+
+Final check if any NA value exist in waste_year_formatted.
+
+```{R}
+waste_year_formatted %>% filter(if_any(everything(), is.na))
+```
+
+We observe that no column contain NA value in waste_year_formatted now.
 
 To analyse the factors influencing EIS, we will be using the previous waste_year_formatted dataset.
 
@@ -696,7 +735,7 @@ To analyse the factors influencing EIS, we will be using the previous waste_year
 glimpse(waste_year_formatted)
 ```
 
-### Environmental Impact Score distribution
+### Environmental Impact Score (EIS) distribution
 
 Firstly, we need to identify EIS is continuous or discrete.
 
@@ -799,10 +838,10 @@ stream <- waste_year_formatted %>%
 stream
 ```
 
-It is observed that their Mean_EIS is very closed to one another. A better way to determine Stream influence on EIS is to observe each Stream distribution across EIS using a violin plot as it shows similar bimodal shapes across all 3 streams.
+It is observed that their Mean_EIS is very closed to one another. We will observe each Stream distribution across EIS using a violin plot as it shows similar bimodal shapes across all 3 streams.
 
 ```{R}
-ggplot(finalised_waste, aes(x = reorder(Stream, Env_Impact_Score, median), y = Env_Impact_Score)) +
+ggplot(waste_year_formatted, aes(x = reorder(Stream, Env_Impact_Score, median), y = Env_Impact_Score)) +
   geom_violin(fill = "steelblue", alpha = 0.6) +
   geom_boxplot(width = 0.1, fill = "white") +
   coord_flip() +
@@ -827,7 +866,7 @@ This implies that xxxxxxxxxxxxxxxxxxxx.
 To analyse if Fate influence EIS, we will observe how the 5 types of Fate differs in mean, standard deviation and total count.
 
 ```{R}
-fate <- finalised_waste %>%
+fate <- waste_year_formatted %>%
   group_by(Fate) %>%
   summarise(
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
@@ -841,7 +880,7 @@ fate
 It is observed that Fate of "Energy recovery", "Long-term storage" and "Waste reuse" has standard deviation of 0, meaning all data points in these set are identical. This indicates that xxxxxxxxxxxxxxxxxxxxxxxxxx.
 
 ```{R}
-ggplot(finalised_waste, aes(x = Fate, y = Env_Impact_Score)) +
+ggplot(waste_year_formatted, aes(x = Fate, y = Env_Impact_Score)) +
   geom_jitter(alpha = 0.05, width = 0.3, height = 0.2, color = "steelblue") +
   stat_summary(fun = mean, geom = "point", size = 4, color = "darkred") +
   coord_flip() +
@@ -853,7 +892,11 @@ ggplot(finalised_waste, aes(x = Fate, y = Env_Impact_Score)) +
   theme_minimal()
 ```
 
-Here observe that: 1. xxxxxxxxxxxxxxx. 2. xxxxxxxxxxxxxxx. 3. xxxxxxxxxxxxxxx.
+Here observe that:
+
+1.   xxxxxxxxxxxxxxx.
+2.  xxxxxxxxxxxxxxx.
+3.  xxxxxxxxxxxxxxx.
 
 This implies that xxxxxxxxxxxxxxx.
 
@@ -862,7 +905,7 @@ This implies that xxxxxxxxxxxxxxx.
 Observation:
 
 ```{R}
-core_non_core <- finalised_waste %>%
+core_non_core <- waste_year_formatted %>%
   group_by(`Core_Non-core`) %>%
   summarise(
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
@@ -878,7 +921,7 @@ core_non_core <- finalised_waste %>%
 
 core_non_core
 
-ggplot(finalised_waste, aes(x = `Core_Non-core`, y = Env_Impact_Score)) +
+ggplot(waste_year_formatted, aes(x = `Core_Non-core`, y = Env_Impact_Score)) +
   geom_boxplot(fill = "steelblue") +
   labs(
     title = "Env Impact Score by Core/Non-core Waste",
@@ -887,42 +930,21 @@ ggplot(finalised_waste, aes(x = `Core_Non-core`, y = Env_Impact_Score)) +
   ) +
   theme_minimal()
 
-ggplot(finalised_waste, aes(x = as.factor(Env_Impact_Score))) +
-  geom_bar(fill = "steelblue") +
-  facet_wrap(~ `Core_Non-core`) +
-  labs(
-    title = "EIS Distribution by Core/Non-core Waste",
-    x = "Environmental Impact Score",
-    y = "Count"
-  ) +
-  theme_minimal()
 
 ```
 
 ### How does EIS changes in each State and economic growth across the years?
 
-To analyse, we first create a new state_econ_score_summary table that computes the Mean_EIS, grouped by state and year. This is done by joining the 2 tables -- finalised_waste and year_state_id by Year_State_ID ad ID.
+To analyse, we first create a new state_econ_score_summary table that computes the Mean_EIS, grouped by state and year.
 
 ```{R}
-state_econ_score_summary <- finalised_waste %>%
-  # joining 2 tables
-  left_join(year_state_id, by = c("Year_State_ID" = "ID")) %>%
-  mutate(
-    # upper State name for consistency
-    State = str_to_upper(State),
-    # extract first 4 digits as Year
-    Year = as.numeric(str_extract(Year, "^\\d{4}"))
-  ) %>%
+state_econ_score_summary <- waste_year_formatted %>%
   group_by(Year, State, Economic_Growth) %>%
   summarise(
     # mean EIS by state and year
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
-    n = n()
-  ) %>%
-  # remove "AUSTRALIA" invalid state value
-  filter(State != "AUSTRALIA") %>%
-  ungroup() %>%
-  arrange(Year)
+    Count = n()
+  )
 
 state_econ_score_summary
 
@@ -937,7 +959,7 @@ state_econ_long <- state_econ_score_summary %>%
 state_econ_long
 ```
 
-Now, we can plot a line-graph containing Economic_Growth over years and Mean_EIS over year for each state.
+We plot a line-graph containing Economic_Growth over years and Mean_EIS over year for each state.
 
 ```{R}
 ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
@@ -956,16 +978,23 @@ ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
   )
 ```
 
-Here, we observed that: 1. Trend of economic growth and mean EIS across the year for every state follows a similar trend. 2. As economic growth increases, mean EIS decrease.
+Here, we observed that:
+
+1.  Trend of economic growth and mean EIS across the year for every state follows a similar trend.
+2.  As economic growth increases, mean EIS decrease.
 
 This implies that xxxxxxxxxxxxxxxx.
 
 ## Q8. Disposal size variation and disposal frequency of each state
 
+In previous task, Tonnes in waste_year_formatted is already cleaned. Hence, no additional data cleaning required.
+
+### Observe tyres disposal
+
 First, we observe waste entries with Type of "Tyres (T140)" and Fate of "Disposal". We need to observe the number of entries and Tonnes values to determine a suitable tonnes_range afterwards.
 
 ```{R}
-tyre_disposal <- year_formatted %>% 
+tyre_disposal <- waste_year_formatted %>% 
   filter(
     Type == "Tyres (T140)",
     Fate == "Disposal"
@@ -975,13 +1004,15 @@ tyre_disposal <- year_formatted %>%
 tyre_disposal %>% select(Type, Fate, Tonnes)
 ```
 
-Now, we check the summary of Tonnes column (min, q1, median, q3, max)
+### Categorization of Tonnes range
+
+Now, we check the summary of Tonnes column in tyre_disposal (min, q1, median, q3, max)
 
 ```{R}
 summary(tyre_disposal$Tonnes)
 ```
 
-We observe that up to the third quatile, Tonnes value is still 0. This means the data is heavily right skewed. Hence, we need to include a zero range. However, we are not dropping zero tonnes values as it can be informative in telling the disposal activity here is negligible. If we drop them, 2 states can end up looking identical in frequency count of "real" disposal event.
+We observe that up to the third quartile, Tonnes value is still 0. This means the data is heavily right skewed. Hence, we need to include a zero range. However, we are not dropping zero tonnes values as it can be informative in telling the disposal activity here is negligible.
 
 Due to the skewness of Tonnes value, it is more suitable to create non-uniform range over a uniform range from 0 to max tonnes. To decide on range, we first observe some sensible breakpoints:
 
@@ -1000,7 +1031,17 @@ tyre_disposal %>%
   ))
 ```
 
-Now, we can decide on Tonnes_ranges with values: 1. 0 (none disposed) 2. 0-500 3.500-5000 4.5000-20000 5.20000+
+Now, we can decide on Tonnes_ranges with values:
+
+- 0 (none disposed)
+
+- 0-500
+
+- 500-5000
+
+- 5000-20000
+
+- 20000+.
 
 We update the tyre_disposal table by mutating a new Tonnes_range column and apply case_when to determine each waste Tonnes_range category.
 
@@ -1054,7 +1095,11 @@ ggplot(tonnes_state, aes(x = reorder(State, Frequency, sum), y = Frequency, fill
   theme_minimal()
 ```
 
-From the bar chart, it inform the manager: 1. State with bar dominated by darker shade (eg: 20000+) are great state for investing in large-scale processing capacity. 2. State with higher frequency mostly in lighter shades (eg: 0, 0-500) suggest many small disposal event, justifying it is not suitable for large infrastructure investment in these states. 3. For instance, VIC, NSW and QLD are best to invest for large-scale tyres processing capacity due to higher frequency of disposal event happening at range of 20000+.
+From the bar chart, it inform the manager:
+
+1.  State with bar dominated by darker shade (eg: 20000+) are great state for investing in large-scale processing capacity.
+2.  State with higher frequency mostly in lighter shades (eg: 0, 0-500) suggest many small disposal event, justifying it is not suitable for large infrastructure investment in these states.
+3.  For instance, VIC, NSW and QLD are best to invest for large-scale tyres processing capacity due to higher frequency of disposal event happening at range of 20000+.
 
 ## Q9 Factor influencing yearly trend of total C&D waste tonnes.
 
