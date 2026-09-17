@@ -688,10 +688,12 @@ The most incremented waste type over year is **Bricks, concrete and pavers** wit
 
 ## Q7. Investigate the factors influencing environmental impact scores (EIS)
 
-To analyse the factors influencing EIS, I will be using the previous finalise_waste dataset containing all required information combined from Waste.csv and Year_State_ID.csv
+The waste_year_formatted table contain all join data from Wastes.csv and Year_State_ID.csv, with Year representing the start year (eg: 2020 from 2020-2021)
+
+To analyse the factors influencing EIS, we will be using the previous waste_year_formatted dataset.
 
 ```{R}
-glimpse(finalised_waste)
+glimpse(waste_year_formatted)
 ```
 
 ### Environmental Impact Score distribution
@@ -704,10 +706,10 @@ finalised_waste %>%
   arrange(Env_Impact_Score)
 ```
 
-Here, we observed the valid EIS found in in dataset are 1, 2, 3, 4, 5, 6, 8 -- indicating EIS is discrete. When we visualise EIS distribution using a bar-chart, we can clearly observe EIS is categorical rather than continuous.
+Here, we observed the valid EIS found in in dataset are 1, 2, 3, 4, 5, 6, 8 -- indicating EIS is discrete. When we visualize EIS distribution using a bar-chart, we can clearly observe EIS is categorical rather than continuous.
 
 ```{R}
-ggplot(finalised_waste, aes(x = Env_Impact_Score)) + 
+ggplot(waste_year_formatted, aes(x = Env_Impact_Score)) + 
   geom_bar(fill = "steelblue") + 
   labs(
     title = "Distribution of Environmental Impact Scores",
@@ -718,47 +720,48 @@ ggplot(finalised_waste, aes(x = Env_Impact_Score)) +
 ```
 
 ```{R}
-conti_table_eis_category <- table(year_formatted$Env_Impact_Score, year_formatted$Category)
+conti_table_eis_category <- table(waste_year_formatted$Env_Impact_Score, waste_year_formatted$Category)
 
 chisq.test(conti_table_eis_category)
 ```
 
 ```{R}
-conti_table_eis_stream <- table(year_formatted$Env_Impact_Score, year_formatted$Stream)
+conti_table_eis_stream <- table(waste_year_formatted$Env_Impact_Score, waste_year_formatted$Stream)
 
 chisq.test(conti_table_eis_stream)
 ```
 
 ```{R}
-conti_table_eis_fate <- table(year_formatted$Env_Impact_Score, year_formatted$Fate)
+conti_table_eis_fate <- table(waste_year_formatted$Env_Impact_Score, waste_year_formatted$Fate)
 
 chisq.test(conti_table_eis_fate)
 ```
 
 ```{R}
-conti_table_eis_core_non <- table(year_formatted$Env_Impact_Score, year_formatted$`Core_Non-core`)
+conti_table_eis_core_non <- table(waste_year_formatted$Env_Impact_Score, waste_year_formatted$`Core_Non-core`)
 
 chisq.test(conti_table_eis_core_non)
 ```
+
+IDK WTF BRO TO DO WITH THIS
 
 ### Is category a factor?
 
 To analyse if Category influence EIS, we first compute the mean EIS of each Category.
 
 ```{R}
-year_state_id
-category <- finalised_waste %>%
+category <- waste_year_formatted %>%
   group_by(Category) %>%
   summarise(
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
     SD_EIS = sd(Env_Impact_Score, na.rm = TRUE),
     Total_Count = n()
-) %>% arrange(Mean_EIS)
+)
 
 category
 ```
 
-We visualise them using a horizontal bar chart with horizontal-axis as Mean_EIS and vertical-axis as category.
+We visualize them using a horizontal bar chart with horizontal-axis as Mean_EIS and vertical-axis as category.
 
 ```{R}
 ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS)) + 
@@ -773,7 +776,10 @@ ggplot(category, aes(x = reorder(Category, Mean_EIS), y = Mean_EIS)) +
 
 ```
 
-We observed that: 1. Organics has lowest Mean_EIS 2. Metals has highest Mean_EIS.
+We observed that:
+
+1.  Organics has lowest Mean_EIS.
+2.  Metals has highest Mean_EIS.
 
 This implies that xxxxxxxxxxxxxxxxxxxxxxxxxxxx.
 
@@ -782,7 +788,7 @@ This implies that xxxxxxxxxxxxxxxxxxxxxxxxxxxx.
 To analyse if Stream influence EIS, we will observe how the 3 types of Stream differs in mean, standard deviation and total count.
 
 ```{R}
-stream <- finalised_waste %>%
+stream <- waste_year_formatted %>%
   group_by(Stream) %>%
   summarise(
     Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
@@ -793,7 +799,7 @@ stream <- finalised_waste %>%
 stream
 ```
 
-It is observed that their Mean_EIS is very closed to one another. A better way to determine Stream influence on EIS is to observe each Stream distribution across EIS using a violin plot as it shows similar bimodal shappes across all 3 streams.
+It is observed that their Mean_EIS is very closed to one another. A better way to determine Stream influence on EIS is to observe each Stream distribution across EIS using a violin plot as it shows similar bimodal shapes across all 3 streams.
 
 ```{R}
 ggplot(finalised_waste, aes(x = reorder(Stream, Env_Impact_Score, median), y = Env_Impact_Score)) +
@@ -808,7 +814,11 @@ ggplot(finalised_waste, aes(x = reorder(Stream, Env_Impact_Score, median), y = E
   theme_minimal()
 ```
 
-Here, observe that: 1. MSW majority waste receive EIS of 5 as observed the density is heavier at the range of EIS = 5. 2. C&I is distributed across EIS of 3, 5, 6 and 8 almost uniformly, with not a specific EIS biased. 3. C&D has majority distribution of EIS = 5 and 6.
+Here, observe that:
+
+1.  MSW majority waste receive EIS of 5 as observed the density is heavier at the range of EIS = 5.
+2.  C&I is distributed across EIS of 3, 5, 6 and 8 almost uniformly, with not a specific EIS biased.
+3.  C&D has majority distribution of EIS = 5 and 6.
 
 This implies that xxxxxxxxxxxxxxxxxxxx.
 
