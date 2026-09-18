@@ -1113,41 +1113,73 @@ From the bar chart, it inform the manager:
 
 ## Q9 Factor influencing yearly trend of total C&D waste tonnes.
 
-### Load external dataset (TRY ANOTHER TIME)
+### Load external dataset (TRYING)
 
 Link to Clusters.csv, SuburbClustered.csv, WeatherData.csv : <https://www.kaggle.com/datasets/nadzmiagthomas/australia-weather-data-2000-2024>
 
 ```{R}
 cluster <- read_csv("data/Clusters.csv")
-cluster %>% head()
+cluster
 
 suburb_cluster <- read_csv("data/SuburbClustered.csv")
-suburb_cluster %>% head()
-# we are only interested in ClusterID and OfficialNameState
-state_cluster_id <- suburb_cluster %>% select(ClusterID, OfficialNameState)
-state_cluster_id %>% head()
+suburb_cluster %>% distinct(OfficialNameState)
+
+
+state_cluster_id <- suburb_cluster %>% 
+  select(ClusterID, OfficialNameState) %>%
+  mutate(
+    OfficialNameState = case_when(
+      str_detect(OfficialNameState, ",") ~ NA,
+      OfficialNameState == "Other Territories" ~ NA,
+      
+      OfficialNameState == "New South Wales" ~ "NSW",
+      OfficialNameState == "Victoria" ~ "VIC",
+      OfficialNameState == "Queensland" ~ "QLD",
+      OfficialNameState == "South Australia" ~ "SA",
+      OfficialNameState == "Western Australia" ~ "WA",
+      OfficialNameState == "Tasmania" ~ "TAS",
+      OfficialNameState == "Northern Territory" ~ "NT",
+      OfficialNameState == "Australian Capital Territory" ~ "ACT",
+      
+      TRUE ~ OfficialNameState
+    )
+  ) %>%
+  drop_na(OfficialNameState)
+
+state_cluster_id %>% distinct(OfficialNameState)
 
 weather_data <- read_csv("data/WeatherData.csv")
 weather_data %>% head()
+
 weather_data_filtered <- weather_data %>% 
-  filter(between(year(Datetime), 2006, 2020))
-
-weather_data_filtered
-
-```
-
-### Complete Australia weather dataset (TRY ANOTHER TIME)
-
-```{R}
-aus_weather <- weather_data_filtered %>%
-  left_join(
-    suburb_cluster,
-    by = "ClusterID"
+  filter(between(year(Datetime), 2006, 2020)) %>%
+  mutate(
+    Year = year(Datetime)
   )
 
-aus_weather %>%
-  arrange(Datetime, OfficialNameState)
+weather_cluster <- weather_data_filtered %>%
+  left_join(
+    state_cluster_id,
+    by = "ClusterID"
+  ) %>%
+  drop_na()
+
+weather_cluster %>% head()
+
+aus_weather <- weather_cluster %>%
+  group_by(Year, OfficialNameState) %>%
+  summarise(
+    Mean_Temp = mean(TemperatureMean),
+    Max_Temp = max(TemperatureMax),
+    Min_Temp = min(TemperatureMin),
+    Count = n()
+  )
+
+aus_weather %>% arrange(Year)
+
 ```
+
+### 
 
 ### External dataset from ABS_Population.xlsx
 
