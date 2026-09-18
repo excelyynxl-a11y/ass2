@@ -1113,7 +1113,7 @@ From the bar chart, it inform the manager:
 
 ## Q9 Factor influencing yearly trend of total C&D waste tonnes.
 
-### Load external dataset
+### Load external dataset (TRY ANOTHER TIME)
 
 Link to Clusters.csv, SuburbClustered.csv, WeatherData.csv : <https://www.kaggle.com/datasets/nadzmiagthomas/australia-weather-data-2000-2024>
 
@@ -1123,6 +1123,7 @@ cluster %>% head()
 
 suburb_cluster <- read_csv("data/SuburbClustered.csv")
 suburb_cluster %>% head()
+# we are only interested in ClusterID and OfficialNameState
 state_cluster_id <- suburb_cluster %>% select(ClusterID, OfficialNameState)
 state_cluster_id %>% head()
 
@@ -1135,7 +1136,7 @@ weather_data_filtered
 
 ```
 
-### Complete Australia weather dataset
+### Complete Australia weather dataset (TRY ANOTHER TIME)
 
 ```{R}
 aus_weather <- weather_data_filtered %>%
@@ -1209,17 +1210,153 @@ population_formatted <- population %>%
   arrange(`State/Territory`)
 
 population_formatted
+```
+
+### Filtering C&D waste from waste_year_formatted
+
+We are only interested in C&D Stream waste. So we filter and save these waste in cnd_waste table. Since waste_year_formatted have been cleaned in previous tasks, hence no additional cleaning required here.
+
+```{R}
+cnd_waste <- waste_year_formatted %>%
+  filter(Stream == "C&D") %>%
+  select(-c("Description", "start", "end"))
+cnd_waste 
+```
+
+Then, we obtain the total C&D tonnes of each state in each year by grouping into State and Year, then sum up Tonnes. Save it into a new cnd_state table.
+
+```{R}
+cnd_state <- cnd_waste %>%
+  group_by(State, Year) %>%
+  summarise(
+    Total_CND_Tonnes = sum(Tonnes)
+  ) %>%
+  arrange(Year)
+
+cnd_state
+```
+
+### Joining cnd_state and population_formatted
+
+To join the 2 table, we observe the pattern of both tables.
+
+```{R}
+population_formatted %>% head()
+cnd_state %>% head()
+```
+
+We observe in population_formatted, we have columns of:
+
+- Sex: Male, Female, Person
+
+- State/Territory: repeating capitalized abbreviated state name
+
+- 2006 to 2020: each value indicating total male, total female and total population of the respective year
+
+We observe in cnd_state we have columns of:
+
+- State: non-repeating capitalized abbreviated state name
+
+- Year: 2006-2020
+
+- Total_CND_Tonnes: sum of tonnes produced by respective state by year
+
+Before joining, we need to reshape population_formatted to match cnd_waste. We do this by pivot_longer() to make each individual year column as a value under a single Year column. Then pivot_wider() to create new Total_Male, Total_Female and Total_Population columns after renaming.
+
+```{R}
+population_reshaped <- population_formatted %>%
+  # convert individual 2006-2020 column into single Year column
+  pivot_longer(
+    cols = `2006`:`2020`,
+    names_to = "Year",
+    values_to = "Population"
+  ) %>%
+  # convert to Year to integer
+  mutate(
+    Year = as.integer(Year)
+  ) %>%
+  # rename State/Territory for consistency 
+  rename(State = `State/Territory`) %>%
+  # convert Population to individual sex-specific population column
+  pivot_wider(
+    names_from = Sex,
+    values_from = Population 
+  ) %>%
+  rename(
+    Total_Male = Male,
+    Total_Female = Female,
+    Total_Population = Person
+  )
+
+population_reshaped
+```
+
+Now, we left join cnd_state to population_reshaped by Year and State.
+
+```{R}
+cnd_population <- cnd_state %>%
+  left_join(
+    population_reshaped,
+    by = c("Year", "State")
+  )
+
+cnd_population
+```
+
+### Visualisation
+
+To determine if population size directly affect C&D Tonnes disposal, a scatterplot and linear trendline is used. X-axis represent total popuation, y-axis represent total C&D tonnes, each point is shaped uniquely according to state.
+
+Scatterplot and trendline is used because:
+
+1.  It reveals the realtionship, stength and direction between the 2 continuous variable (total population, C&D waste tonnes).
+2.  Trendline shows the general trend across data points.
+
+```{R}
+
+ggplot(cnd_population, aes(x = Total_Population, y = Total_CND_Tonnes)) +
+  geom_point(aes(color = Year, shape = State), size = 3, alpha = 0.8) +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed") +
+  scale_color_viridis_c() +
+  scale_x_continuous(labels = scales::comma) +
+  labs(
+    title = "Relationship Between Population and CND Waste (2006–2020)",
+    subtitle = "Points represent individual years per state",
+    x = "Total Population",
+    y = "Total CND Waste (Tonnes)",
+    color = "Year",
+    shape = "State"
+  ) +
+  theme_minimal()
 
 ```
 
-### External dataset from GitHub 1 (2008-2017)
+From the scatterplot, we observe that:
+
+- Trendline shows a positive linear relationship between total C&D tonnes and population. States and years with population proportionally generates lower C&D waste tonnes; whereas states and years with higher population increases C&D waste tonnes.
+
+- This enable us to generate the **hypothesis** that the underlying reason can be when population increases, more housing and facility will need to be constructed to support the community, resulting in higher disposal of C&D due to higher construction activity.
+
+### IDK BRO
 
 ```{R}
-url <- "https://raw.githubusercontent.com/javier-sudo/-Caso-weatherAUS-Mineria-de-datos/refs/heads/main/weatherAUS.csv"
+# 1. Calculate Waste Per Capita (Tonnes per person)
+combined_data <- cnd_population %>%
+  mutate(CND_per_capita = Total_CND_Tonnes / Total_Population)
 
-weather_data <- read.csv(url)
-weather_data %>% head()
-weather_data %>% filter(substr(Date, 1, 4) == "2017")
+# 2. Line plot of Per Capita waste across years by State
+ggplot(combined_data, aes(x = Year, y = CND_per_capita, color = State, group = State)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  facet_wrap(~ State, scales = "free_y") +  # Individual panel per state
+  labs(
+    title = "CND Waste Per Capita Trend Across Years",
+    x = "Year",
+    y = "CND Waste Per Person (Tonnes)",
+    caption = "Source: ABS & CND Waste Datasets"
+  ) +
+  theme_bw() +
+  theme(legend.position = "none")
 ```
 
 ### 
