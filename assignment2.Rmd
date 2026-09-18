@@ -7,10 +7,12 @@ date: "2026-08-25"
 
 # Assignment 2
 
-### Load tidyverse
+### Load tidyverse, lubridate, readxl
 
 ```{R}
 library(tidyverse)
+library(lubridate)
+library(readxl)
 ```
 
 ### Load and save Wastes.csv and Year_State_ID.csv
@@ -740,7 +742,7 @@ glimpse(waste_year_formatted)
 Firstly, we need to identify EIS is continuous or discrete.
 
 ```{R}
-finalised_waste %>% 
+waste_year_formatted %>% 
   distinct(Env_Impact_Score) %>% 
   arrange(Env_Impact_Score)
 ```
@@ -894,9 +896,17 @@ ggplot(waste_year_formatted, aes(x = Fate, y = Env_Impact_Score)) +
 
 Here observe that:
 
-1.   xxxxxxxxxxxxxxx.
-2.  xxxxxxxxxxxxxxx.
-3.  xxxxxxxxxxxxxxx.
+1.  
+
+    cl. 
+
+2.  
+
+    cl. 
+
+3.  
+
+    cl. 
 
 This implies that xxxxxxxxxxxxxxx.
 
@@ -1103,6 +1113,113 @@ From the bar chart, it inform the manager:
 
 ## Q9 Factor influencing yearly trend of total C&D waste tonnes.
 
+### Load external dataset
+
+Link to Clusters.csv, SuburbClustered.csv, WeatherData.csv : <https://www.kaggle.com/datasets/nadzmiagthomas/australia-weather-data-2000-2024>
+
 ```{R}
+cluster <- read_csv("data/Clusters.csv")
+cluster %>% head()
+
+suburb_cluster <- read_csv("data/SuburbClustered.csv")
+suburb_cluster %>% head()
+state_cluster_id <- suburb_cluster %>% select(ClusterID, OfficialNameState)
+state_cluster_id %>% head()
+
+weather_data <- read_csv("data/WeatherData.csv")
+weather_data %>% head()
+weather_data_filtered <- weather_data %>% 
+  filter(between(year(Datetime), 2006, 2020))
+
+weather_data_filtered
 
 ```
+
+### Complete Australia weather dataset
+
+```{R}
+aus_weather <- weather_data_filtered %>%
+  left_join(
+    suburb_cluster,
+    by = "ClusterID"
+  )
+
+aus_weather %>%
+  arrange(Datetime, OfficialNameState)
+```
+
+### External dataset from ABS_Population.xlsx
+
+Australia Bureau of Statistics, Population Size and Growth: <https://www.abs.gov.au/statistics/people/population/historical-population/latest-release#data-downloads>
+
+```{R}
+# read from ABS_Population.xlsx, skip the first 4 row (headers)
+population <- read_excel("data/ABS_Population.xlsx", skip = 4)
+population
+```
+
+### Data cleaning external dataset
+
+We observed the original dataset consist on each year from 1902-2021 as individual column. We filter only relevant years, which are 2006-2020, matching the Waste.csv and Year_State_ID.csv.
+
+```{R}
+population <- population %>% 
+  select(Sex, `State/Territory`, `2006`:`2020`) %>% 
+  arrange(`State/Territory`) 
+
+population
+```
+
+We have some info about the State/Territory value.
+
+1.  State/Territory of "Australia(e)" refers the the total amount of Male, Female and overall for each year across the entire nation.
+2.  State/Territory with NA have entire rows being NA, except Sex, which indicates the NA is a result from header.
+3.  State/Territory have mixture of upper and lowercase.
+
+We can replace the State/Territory values to match our waste_year_formatted.
+
+```{R}
+# view how state are formatted in waste_year_formatted
+waste_year_formatted %>% distinct(State)
+# view how State/Territory are formatted in population
+population %>% distinct(`State/Territory`)
+```
+
+We capitalized and abbreviate all State/Territory values in population using recode(), replace "Australia(e)" with a meaningful name using case_when() and finally drop off all NA values .
+
+```{R}
+
+population_formatted <- population %>%
+  mutate(
+    `State/Territory` = recode(
+      `State/Territory`,
+      "Vic." = "VIC",
+      "Qld" = "QLD",
+      "Tas." = "TAS",
+      "ACT(d)" = "ACT"
+    ),
+    `State/Territory` = case_when(
+      `State/Territory` == "Australia(e)" & Sex == "Male" ~ "Total Male",
+      `State/Territory` == "Australia(e)" & Sex == "Female" ~ "Total Female",
+      `State/Territory` == "Australia(e)" & Sex == "Person" ~ "Total",
+      TRUE ~ `State/Territory`
+    )
+  ) %>%
+  filter(!is.na(`State/Territory`)) %>%
+  arrange(`State/Territory`)
+
+population_formatted
+
+```
+
+### External dataset from GitHub 1 (2008-2017)
+
+```{R}
+url <- "https://raw.githubusercontent.com/javier-sudo/-Caso-weatherAUS-Mineria-de-datos/refs/heads/main/weatherAUS.csv"
+
+weather_data <- read.csv(url)
+weather_data %>% head()
+weather_data %>% filter(substr(Date, 1, 4) == "2017")
+```
+
+### 
