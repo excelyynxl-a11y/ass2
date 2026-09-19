@@ -15,7 +15,7 @@ library(lubridate)
 library(readxl)
 ```
 
-### Load and save Wastes.csv and Year_State_ID.csv
+### Read and save Wastes.csv and Year_State_ID.csv
 
 ```{R}
 waste <- read_csv("data/Wastes.csv")
@@ -32,21 +32,19 @@ Prior to conducting analysis, we will determine how to handle missing values by 
 ```{R}
 missing_entries <- waste %>% 
   filter(if_any(everything(), is.na))
+
 missing_entries 
 ```
 
-The NA values observed:
+The 32 rows with NA observed:
 
-1.  A row of Category "Space debris" has several NA values across Case_ID, Year_State_ID, Stream, Fate, Tonnes, Core_Non-core and Description. Hence, the suitable approach is to drop this case.
+1.  A row of Category "Space debris" has several NA values across Case_ID, Year_State_ID, Stream, Fate, Tonnes, Core_Non-core and Description. Hence, the suitable approach is to drop this case. since it is only a small fraction of the entire dataset (1 entry) with several missing values.
 
 ```{R}
 # drop entry with Category "Space debris"
 waste_drop <- waste %>%
   filter(is.na(Category) | Category != "Space debris")
 
-# check entry with Category "Space debris" j=has been removed
-waste_drop %>% 
-  filter(if_any(everything(), is.na))
 ```
 
 2.  The remaining 30 entries only has one variable with NA value. The NAs are small in number and located in few cases and variables. Hence, the suitable approach is to impute these values by replacing with appropriate values by doing analysis and observation as we move on to each task.
@@ -84,7 +82,7 @@ concerning_category <- c(
 To determine how to impute the concerning_category, we can observe others related field like Type, Stream and Fate.
 
 ```{R}
-# inspect concerning Category values to determine appropriate way on how to replace
+# inspect concerning Category values to determine appropriate way on how to impute
 waste_drop %>%
   filter(
     Category %in% concerning_category |
@@ -100,16 +98,16 @@ waste_drop %>%
 
 The concerning Category observed that requires data cleaning action:
 
-1.  "Building & demolition materials" and "Building and demolition materials" is the same Category but naming inconsistency.
+1.  "Building & demolition materials" should be replaced with "Building and demolition materials" is the same Category but naming inconsistency.
 2.  "Hazardous wastes" and "HW" is the same Category but naming inconsistency.
 3.  "Plastic" and "Plastics" is the same Category but naming inconsistency.
 4.  "organics" and "Organics" is the same Category but naming inconsistency.
-5.  "Aluminium" is a Type, not Category. Should be replaced with "Metals"
+5.  "Aluminium" is a Type, not Category. Should be replaced with "Metals".
 6.  "Metals & Organics" entry has Type of "Food organics". Should be replaced with Category of "Organics".
 7.  "Toxic wastes" has Type mentioning "hazardous wastes". Should be replaced with "Hazardous wastes" for consistency.
 8.  "Recycling" entry has Type "Polyvinyl chloride (PVC) (3)", which reflects a Category "Plastics". Furthermore, "Recycling" is a Fate, not a Category.
 
-NA Category are further analyse to determine a suitable replacement. We can create a na_category_type table to infer waste of similar Type has what kind of category. This is done by joining na_category_type and waste_drop table.
+NA Category are further analyse to determine a suitable replacement. We create a na_category_type table to infer waste of similar Type has what kind of category.
 
 ```{R}
 na_category_type <- waste_drop %>% 
@@ -118,14 +116,18 @@ na_category_type <- waste_drop %>%
   ) %>% distinct(Type)
 
 na_category_type
+```
 
-waste %>% semi_join(
+Then join na_category_type to waste_drop table to determine a suitable value to replace NA.
+
+```{R}
+waste_drop %>% semi_join(
   na_category_type,
   by = "Type"
 ) %>% select(Category, Type)
 ```
 
-It is observed that the NA Category values with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)" belongs to Category of "Hazardous wastes", informing us:
+It is observed that the all NA Category values with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)" belongs to Category of "Hazardous wastes", informing us:
 
 9.  NA entry with Type of "Other soil/sludges (other N)" and "Paints, resins, inks, organic sludges (F)", which is suitable to be replaced with "Hazardous wastes".
 
@@ -138,7 +140,7 @@ waste_unique <- waste_drop %>%
   mutate(
     Category = recode(
       Category,
-      # naming inconsistency
+      # spelling inconsistency
       "HW" = "Hazardous wastes",
       "Plastic" = "Plastics",
       "organics" = "Organics",
@@ -151,7 +153,7 @@ waste_unique <- waste_drop %>%
       "Recycling" = "Plastics"
     ),
     Category = case_when(
-      # missing Category is inferred from their Type
+      # missing Category is inferred from Type
       is.na(Category) &
         Type == "Other soil/sludges (other N)" ~
         "Hazardous wastes",
@@ -161,9 +163,10 @@ waste_unique <- waste_drop %>%
       TRUE ~ Category
     )
   )
+
 ```
 
-Observe new unique category
+Observe new unique Category.
 
 ```{R}
 waste_unique %>%
@@ -177,19 +180,15 @@ waste_unique %>%
 To count number of unique waste category, we get the number of rows of unique data from Category column in waste_unique table.
 
 ```{R}
-# get each distinct values in Category column and count total row
 number_unique_wastes_category <- waste_unique %>% 
-  distinct(Category) %>%
-  nrow()
+  summarise(
+    Total_Unique_Category = n_distinct(Category)    
+  )
 
 number_unique_wastes_category
 ```
 
-After data cleaning, the resulting unique Category only has 11 values.
-
-### Q1 Final Answer
-
-Total unique "Category" values is **11**.
+After data cleaning, the total unique Category has 11 values.
 
 ## Q2. Number of negative feedback comments in the 'Description' column with an environmental impact score of 2 or 3
 
@@ -223,7 +222,8 @@ waste_unique <- waste_unique %>%
 
 waste_unique %>% 
   select(Env_Impact_Score) %>% 
-  arrange(Env_Impact_Score)
+  arrange(Env_Impact_Score) %>%
+  head()
 
 ```
 
@@ -231,15 +231,15 @@ To count number of entries with Env_Impact_Score value of 2-3, we filter only ro
 
 ```{R}
 number_negative_env_impact_score <- waste_unique %>%
-  filter(Env_Impact_Score %in% c(2,3)) %>%
+  filter(
+    Env_Impact_Score %in% c(2,3)
+  ) %>%
   summarise(
-    total_negative_env_impact_score = n()
+    Total_Negative_Env_Impact_Score = n()
   )
 
 number_negative_env_impact_score
 ```
-
-### Q2 Final Answer
 
 Total negative feedback comments in "Description" with environmental impact score of 2 or 3 is **6312**
 
@@ -260,7 +260,7 @@ We observed from the Stream column contain duplicated values for the same Stream
 1.  "Construction and demolition waste" should be standardized to "C&I"
 2.  "Municipal solid waste" should be standardized to "MSW"
 
-We will standardized them accordingly to specification: all Stream values will be replace to only 3 options: C&I, C&D, MSW using recode(). This ensure same waste are being treated as the same stream group when calculating fraction later.
+We will standardized them accordingly to specification: all Stream values will be replace to only 3 options: C&I, C&D, MSW using recode(). This ensure same waste are treated the same stream group when calculating fraction later.
 
 ```{R}
 waste_unique <- waste_unique %>%
@@ -289,7 +289,9 @@ Observe any NA Tonnes values from waste_unique.
 
 ```{R}
 waste_unique %>% 
-  filter(is.na(Tonnes)) %>%
+  filter(
+    is.na(Tonnes)
+  ) %>%
   select(Case_ID, Tonnes, Description)
 ```
 
@@ -299,12 +301,13 @@ We inspect the NA tonnes count and percentage of how much these NA values consti
 # calculate na_tonnes_count and na_percentage
 waste_unique %>%
   summarise(
-    na_tonnes_count = sum(is.na(Tonnes)),
-    na_percentage = mean(is.na(Tonnes)) * 100
+    NA_Tonnes_Count = sum(is.na(Tonnes)),
+    Total_Tonnes = n(),
+    NA_Percentage = NA_Tonnes_Count / Total_Tonnes * 100
   )
 ```
 
-There is a total of 14 NA NA Tonnes in waste_unique, makes u only a small proportion (0.038%) of the dataset. Hence, NA tonnes will simply be dropped off.
+There is a total of 14 NA Tonnes in waste_unique, which makes only a small proportion (0.038%) of the dataset. Furthermore, the other reference column like Decsription also shows "total of nan tonnes", which is provide no information on how to impute Tonnes. Hence, NA tonnes will simply be drop
 
 ```{R}
 # drop NA Tonnes values
@@ -341,12 +344,23 @@ waste_unique <- waste_unique %>%
 
 ### Calculating Waste Fraction
 
-To calculate waste fraction, a new waste_fraction table is created by: - grouping waste_unique by Category and Stream - Stream_Tonnes is then obtained by summing Tonnes in each group. - Category_Total is sum of Stream_Tonnes. - Fraction is Stream_Tonnes / Category_Total
+To calculate waste fraction, a new waste_fraction table is created by:
+
+- Grouping waste_unique by Category and Stream.
+
+- Stream_Tonnes is then obtained by summing Tonnes in each group.
+
+- Category_Total is sum of Stream_Tonnes.
+
+- Fraction is Stream_Tonnes / Category_Total
 
 ```{R}
 waste_fraction <- waste_unique %>%
   group_by(Category, Stream) %>%
-  summarise(Stream_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
+  summarise(
+    Stream_Tonnes = sum(Tonnes, na.rm = TRUE)
+  ) %>%
+  ungroup() %>%
   group_by(Category) %>%
   mutate(
     Category_Total = sum(Stream_Tonnes),
@@ -359,11 +373,13 @@ waste_fraction <- waste_unique %>%
       levels = sort(unique(Category))
     )
   )
+
+waste_fraction %>% arrange(Stream)
 ```
 
 ### Visualization of Fraction of Waste Tonnes by Source of each Category
 
-To visualize the fraction number specific to category value, a stacked bar chart with x-axis represent Category and y-axis represent Fraction of Tonnes and color of bars to distinguish each Stream. A bar chart is suitable because Category and Stream and categorical variable, whereas the fraction are proportions that sums to 100% within each Category. The fraction of waste is comparable across all waste Category.
+To visualize the proportional distribution of waste streams within each category, a 100% filled stacked bar chart was selected. The x-axis represents discrete waste Category, y-axis represents the Fraction of Tonnes and fill color distinguishes the contributing waste Streams. A proportional stacked bar chart is suitable because Category and Stream are nominal categorical variables, while the computed fractions represent relative compositions that sum to 100% within each Category. Normalizing the data into proportions allows direct comparison of stream composition across categories of varying total waste volumes.
 
 ```{R}
 ggplot(
@@ -391,10 +407,17 @@ ggplot(
 Inspect the year_state_id unique State values;
 
 ```{R}
-year_state_id %>% distinct(State)
+year_state_id %>% count(State) %>% arrange(n)
 ```
 
-We observed that State naming are inconsistent with mixture of upper/lowercase and all upper case. An invalid "Australia" is also observed.
+We observed that:
+
+1.  State naming are inconsistent with mixture of upper/lowercase and all upper case.
+2.  Invalid "Australia" is also observed with only a frequency of 2. As mentioned in brief, State are "State or territory in which the waste was generated." but "Australia" is a country.
+
+```{R}
+year_state_id %>% filter(State == "Australia")
+```
 
 Inspect the year_state_id unique Year values;
 
@@ -402,7 +425,8 @@ Inspect the year_state_id unique Year values;
 year_state_id %>% distinct(Year)
 ```
 
-We observe that some Year are invalid financial year (eg: 2005-2011, 2005-2012, 2005-2013) as mentioned in the brief, a valid financial Year should look like 2006-2007 and 2020-2021.
+We observe that some Year are invalid financial year (eg: 2005-2007, 2005-2008, 2005-2009\
+2005-2010, 2005-2011, 2005-2012, 2005-2013) as mentioned in the brief, a valid financial Year should have a range of 1 year (eg: 2006-2007 and 2020-2021).
 
 We will create a new year_clean table that:
 
@@ -416,15 +440,18 @@ year_clean <- year_state_id %>%
   mutate(
     State = str_to_upper(State)
   ) %>%
+  # separate start and end year
   separate(
     Year,
     into = c("start", "end"),
     sep = "-",
     remove = FALSE) %>%
+  # convert to numeric
   mutate(
     start = as.numeric(start),
     end = as.numeric(end) 
   ) %>% 
+  # remove invalid year range
   filter(
     end - start == 1
   )
@@ -434,7 +461,7 @@ year_clean
 
 ### Joining Year_State_ID.csv and Wastes.csv into temp
 
-To combine both Year_State_ID.csv and Wastes.csv into a waste_year table, left join waste_unique to year_clean. Left-join is used because the main goal is to add Year and State from Year_State_ID.csv into Wastes.csv by Year_State_ID (primary key in Year_State_ID.csv) and ID (foreign key in Wastes.csv), retaining all entries from Wastes.csv
+To combine both Year_State_ID.csv and Wastes.csv into a waste_year table, left join waste_unique as primary table to year_clean as look-up table. Left-join is used because the main goal is to add Year and State attribute from year_clean onto every entry in waste_unique. Left join will oink foreign key (Year_State_ID from waste_unique) to primary key (ID in year_clean). This ensures all observation records from waste_unique are fully preserved.
 
 ```{R}
 waste_year <- waste_unique %>%
@@ -442,24 +469,28 @@ waste_year <- waste_unique %>%
     year_clean, 
     by = c("Year_State_ID" = "ID")
   )
-
-waste_year
 ```
 
-After joining, we filter to remove the invalid AUSTRALIA state.
+To determine how to handle "AUSTRALIA", we observe the row.
+
+```{R}
+waste_year %>% filter(State == "AUSTRALIA")
+```
+
+Since there is no useful information on how to impute State of "AUSTRALIA" and considering it is only 1 entry of the entire dataset, we will simply filter to remove the invalid AUSTRALIA state.
 
 ```{R}
 waste_year <- waste_year %>% 
   filter(State != "AUSTRALIA")
-
-waste_year
 ```
 
-Next, we create the new temp table by:
+### Temp dataset
+
+Next, we create the new temp by:
 
 - Calculating Tonnes_Waste_Year. Year and State are grouped in order to compute Tonnes_Waste_Year by summarizing to to sum Tonnes of each group.
 
-- Reshaping waste_year to make each state as a single column.
+- Reshaping waste_year to make each state as a single column using pivot_wider().
 
 ```{R}
 temp <- waste_year %>%
@@ -496,21 +527,22 @@ waste_year_formatted <- waste_year %>%
     Year = as.numeric(str_extract(Year, "^\\d{4}"))
   )
 
-waste_year_formatted 
+waste_year_formatted %>% head()
 ```
 
 Observe Type in waste_year_formatted.
 
 ```{R}
 waste_year_formatted %>% 
-  count(Type)
+  count(Type) %>% 
+  arrange(n)
 ```
 
 We observe that all Type has been assigned to a valid entry and no NA Type is detected. Thus, no data cleaning is required on Type.
 
 ### Filter food organics
 
-Before analyzing food organics, a new food_organics_waste table with only data of food organics is created. The entries consist of filtered Type that equals "Food Organics". To obtain Food_Organic_Tonnes, table is grouped by Year and State, then obtained by summing each group Tonnes values.
+Before analyzing food organics, a new food_organics_waste table with only data of food organics is created. The entries consist of Type that equals "Food Organics". To obtain Food_Organic_Tonnes, table is grouped by Year and State, then obtained by summing each group Tonnes values.
 
 The food_organics_waste table has: 1. Year 2. State 3. Food_Organics_Tonnes
 
@@ -522,14 +554,15 @@ food_organics_waste <- waste_year_formatted %>%
   group_by(Year, State) %>%
   summarise(
     Food_Organics_Tonnes = sum(Tonnes, na.rm = TRUE)
-  )
+  ) %>%
+  ungroup()
 
 food_organics_waste
 ```
 
 ### Plot food organics by year
 
-To visualize yearly trend of food organics waste tonnes by state, a line chart is plotted with x-axis as year and y-axis as total food organics waste tonnes. Line chart is suitable because we want to observe how food organics changes across the year for each state that can be differentiated by colors.
+To observe yearly trend of food organics waste tonnes by state, a multiline chart is plotted with x-axis as year and y-axis as total food organics waste tonnes, each line is of a different color to represent each state. Line chart is suitable because we want to visualise the trend of food organics waste across a timeline. Line of differing color allow efficient comparative evaluation.
 
 ```{R}
 ggplot(food_organics_waste, aes(x = Year, y = Food_Organics_Tonnes, color = State)) + 
@@ -549,14 +582,14 @@ ggplot(food_organics_waste, aes(x = Year, y = Food_Organics_Tonnes, color = Stat
 Observe Fate values of waste_year_formatted.
 
 ```{R}
-waste_year_formatted %>% distinct(Fate)
+waste_year_formatted %>% count(Fate) %>% arrange(n)
 ```
 
-We observe that all 5 Fate values are valid as mentioned in brief without NA values present. Thus, no data cleaning on Fate is requried.
+We observe that all 5 Fate values are valid, distinct with non-zero count as mentioned in brief without NA values present. Thus, no data cleaning on Fate is required.
 
 ### Waste with recycling as Fate
 
-Before analyzing recycling fate waste, a new fate_recycling table with only data of recycling fate is created. The entries consist of filtered Fate that equals "Recycling".
+A new fate_recycling table is created with entries consist of filtered Fate that equals "Recycling".
 
 ```{R}
 fate_recycling <- waste_year_formatted %>% 
@@ -577,7 +610,7 @@ recycled_waste_type <- fate_recycling %>%
   ) %>%
   ungroup()
 
-recycled_waste_type
+recycled_waste_type %>% arrange(Year)
 ```
 
 ### Most recycled waste type
@@ -591,9 +624,11 @@ most_recycled_waste_type <- recycled_waste_type %>%
 most_recycled_waste_type
 ```
 
+The most recycled waste Type is **Bricks, concrete and pavers** in the year **2020** with a total tonnes of **10478681** tonnes.
+
 ### Waste with energy-recovered as Fate
 
-Before analysing energy-recovered fate waste, a new fate_energy_recovered table with only data of energy-recovered fate is created. The entries consist of filtered Fate that equals "Energy Recovered".
+A new fate_energy_recovered table is created with entries consist of filtered Fate that equals "Energy Recovered".
 
 ```{R}
 fate_energy_recovery <- waste_year_formatted %>%
@@ -612,7 +647,7 @@ energy_recovered_waste_type <- fate_energy_recovery %>%
   summarise(Energy_Recovered_Tonnes = sum(Tonnes, na.rm = TRUE)) %>%
   ungroup()
 
-energy_recovered_waste_type
+energy_recovered_waste_type %>% arrange(Year)
 ```
 
 ### Most energy-recovered waste type
@@ -626,9 +661,11 @@ most_energy_recovered_waste_type <- energy_recovered_waste_type %>%
 most_energy_recovered_waste_type
 ```
 
+The most recycled waste Type is **Food organics** in the year **2015** with a total tonnes of **1140998**.
+
 ### Find first (2006) and last year (2020) data of each waste type
 
-Filter only entry in waste_year_formatted that has a Tonnes value in the year of 2006 and 2020.
+Filter only entry in waste_year_formatted that has a Tonnes value in the year of 2006 and 2020 as described in brief, the original data presented in Year_State_ID.csv is between 2006-2007 (2006) and 2020-2021 (2020).
 
 ```{R}
 first_last_waste_type <- waste_year_formatted %>%
@@ -636,7 +673,7 @@ first_last_waste_type <- waste_year_formatted %>%
   distinct(Type, Year) %>%
   count(Type, name = "Count")
 
-first_last_waste_type
+first_last_waste_type %>% arrange(Count)
 ```
 
 To ensure we can calculate most incremented waste type over the year, we need both start (2006) and end (2020) year to compute. We observed that 5 waste types only have either one (2006 or 2020) data, thus would fail to produce a result (end - start) if computation were done. Hence, we need to remove these values before proceeding for computation.
@@ -692,8 +729,6 @@ most_incremented_waste_type <- waste_type_start_end %>%
 
 most_incremented_waste_type  
 ```
-
-### Q6 Final Answer
 
 The most incremented waste type over year is **Bricks, concrete and pavers** with an increase of **8345529** Tonnes.
 
