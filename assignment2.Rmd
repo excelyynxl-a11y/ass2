@@ -758,13 +758,7 @@ waste_year_formatted <- waste_year_formatted %>%
   )
 ```
 
-Final check if any NA value exist in waste_year_formatted.
-
-```{R}
-waste_year_formatted %>% filter(if_any(everything(), is.na))
-```
-
-We observe that no column contain NA value in waste_year_formatted now.
+### Analyse Environmental Impact Score (EIS)
 
 To analyse the factors influencing EIS, we will be using the previous waste_year_formatted dataset.
 
@@ -782,7 +776,7 @@ waste_year_formatted %>%
   arrange(Env_Impact_Score)
 ```
 
-Here, we observed the valid EIS found in in dataset are 1, 2, 3, 4, 5, 6, 8 -- indicating EIS is discrete. When we visualize EIS distribution using a bar-chart, we can clearly observe EIS is categorical rather than continuous.
+Here, we observed the valid EIS found in in dataset are 1, 2, 3, 4, 5, 6, 8 – indicating EIS is discrete. When we visualize EIS distribution using a bar-chart, we can clearly observe EIS is categorical rather than continuous.
 
 ```{R}
 ggplot(waste_year_formatted, aes(x = Env_Impact_Score)) + 
@@ -929,20 +923,6 @@ ggplot(waste_year_formatted, aes(x = Fate, y = Env_Impact_Score)) +
   theme_minimal()
 ```
 
-Here observe that:
-
-1.  
-
-    cl. 
-
-2.  
-
-    cl. 
-
-3.  
-
-    cl. 
-
 This implies that xxxxxxxxxxxxxxx.
 
 ### Is Core_Non-core a factor?
@@ -974,8 +954,6 @@ ggplot(waste_year_formatted, aes(x = `Core_Non-core`, y = Env_Impact_Score)) +
     y = "Env Impact Score"
   ) +
   theme_minimal()
-
-
 ```
 
 ### How does EIS changes in each State and economic growth across the years?
@@ -983,7 +961,9 @@ ggplot(waste_year_formatted, aes(x = `Core_Non-core`, y = Env_Impact_Score)) +
 To analyse, we first create a new state_econ_score_summary table that computes the Mean_EIS, grouped by state and year.
 
 ```{R}
-state_econ_score_summary <- waste_year_formatted %>%
+waste_year_formatted %>% filter(Year == 2020 | Year == 2006) %>% select(Year, Economic_Growth) %>% arrange(Year)
+s
+tate_econ_score_summary <- waste_year_formatted %>%
   group_by(Year, State, Economic_Growth) %>%
   summarise(
     # mean EIS by state and year
@@ -1023,12 +1003,122 @@ ggplot(state_econ_long, aes(x = Year, y = Value, color = Metric)) +
   )
 ```
 
-Here, we observed that:
+Here, we observed that trend of economic growth and mean EIS across the year for every state follows a similar trend, which is as economic growth increases, mean EIS decrease.
 
-1.  Trend of economic growth and mean EIS across the year for every state follows a similar trend.
-2.  As economic growth increases, mean EIS decrease.
+This means that economic growth that reflects measures how much a waste process affects the environment leads to more environmentally damaging waste outcomes. This leads to the hypothesis that rapid economic growth driving massive industrial or construction output, overwhelming recycling facilities and opting on quick, low-cost disposal fate.
 
-This implies that xxxxxxxxxxxxxxxx.
+To analyse this hypothesis, we will consider Fate and Stream.
+
+```{R}
+stream_fate_yearly <- waste_year_formatted %>%
+  group_by(Year, State, Stream, Fate) %>%
+  summarise(
+    Total_Tonnes = sum(Tonnes, na.rm = TRUE),
+    Mean_EIS = mean(Env_Impact_Score, na.rm = TRUE),
+  ) 
+
+stream_fate_yearly %>% arrange(Year)
+
+stream_fate_proportion <- stream_fate_yearly %>%
+  group_by(Year, Stream, Fate) %>%
+  summarise(Tonnes = sum(Total_Tonnes), .groups = "drop") %>%
+  group_by(Year, Stream) %>%
+  mutate(
+    Stream_Total = sum(Tonnes),
+    Fate_Proportion = Tonnes / Stream_Total
+  ) %>%
+  ungroup()
+
+stream_fate_proportion
+
+ggplot(stream_fate_yearly, aes(x = Year, y = Total_Tonnes, color = Stream, group = Stream)) +
+  stat_summary(fun = sum, geom = "line", linewidth = 1) +
+  stat_summary(fun = sum, geom = "point", size = 2) +
+  facet_wrap(~ State, scales = "free_y") +
+  scale_x_continuous(breaks = c(2006, 2010, 2015, 2020)) +
+  scale_y_continuous(labels = scales::comma) +
+  geom_vline(xintercept = 2020, linetype = "dashed", color = "red", alpha = 0.7) +
+  labs(
+    title = "Waste Stream Tonnage Trajectories across States (2006–2020)",
+    subtitle = "Dashed line indicates 2020 Economic Shock (COVID-19)",
+    x = "Year",
+    y = "Total Tonnage",
+    color = "Waste Stream"
+  ) +
+  theme_bw()
+
+ggplot(stream_fate_proportion, aes(x = Year, y = Fate_Proportion, fill = Fate)) +
+  geom_area(alpha = 0.85, position = "fill") +
+  facet_wrap(~ Stream) +
+  scale_x_continuous(breaks = c(2006, 2010, 2015, 2020)) +
+  scale_y_continuous(labels = scales::percent) +
+  geom_vline(xintercept = 2020, linetype = "dashed", color = "black") +
+  labs(
+    title = "Compositional Shift in Waste Fate by Stream (2006–2020)",
+    subtitle = "Tracks proportion of Recycling, Disposal, Energy Recovery, and Storage",
+    x = "Year",
+    y = "Proportion of Stream Volume",
+    fill = "Waste Fate"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+```{R}
+fate_by_state_year <- waste_year_formatted %>%
+  group_by(Year, State, Fate) %>%
+  summarise(Total_Tonnes = sum(Tonnes, na.rm = TRUE), .groups = "drop")
+
+fate_by_state_year
+
+ggplot(fate_by_state_year, aes(x = Year, y = Total_Tonnes, color = Fate, group = Fate)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.8) +
+  facet_wrap(~ State, scales = "free_y") +  # Allows each state its own y-axis scale
+  scale_x_continuous(breaks = c(2006, 2010, 2015, 2020)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Waste Management Fate Trajectories by State (2006–2020)",
+    subtitle = "Tracking volume trends of Disposal, Recycling, Energy Recovery, and Storage",
+    x = "Year",
+    y = "Total Waste (Tonnes)",
+    color = "Waste Fate"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "#f0f0f0"),
+    strip.text = element_text(face = "bold")
+  )
+```
+
+```{R}
+stream_by_state_year <- waste_year_formatted %>%
+  group_by(Year, State, Stream) %>%
+  summarise(Total_Tonnes = sum(Tonnes, na.rm = TRUE), .groups = "drop")
+
+stream_by_state_year
+
+ggplot(stream_by_state_year, aes(x = Year, y = Total_Tonnes, color = Stream, group = Stream)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 1.8) +
+  facet_wrap(~ State, scales = "free_y") +
+  scale_x_continuous(breaks = c(2006, 2010, 2015, 2020)) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Waste Stream Composition Trajectories by State (2006–2020)",
+    subtitle = "Tracking volume trends across C&D, C&I, and MSW streams",
+    x = "Year",
+    y = "Total Waste (Tonnes)",
+    color = "Waste Stream"
+  ) +
+  theme_bw() +
+  theme(
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "#f0f0f0"),
+    strip.text = element_text(face = "bold")
+  )
+```
 
 ## Q8. Disposal size variation and disposal frequency of each state
 
@@ -1057,7 +1147,7 @@ Now, we check the summary of Tonnes column in tyre_disposal (min, q1, median, q3
 summary(tyre_disposal$Tonnes)
 ```
 
-We observe that up to the third quartile, Tonnes value is still 0. This means the data is heavily right skewed. Hence, we need to include a zero range. However, we are not dropping zero tonnes values as it can be informative in telling the disposal activity here is negligible.
+We observe that up to third quartile, Tonnes value is still 0. This means the data is heavily right skewed. Hence, we need to include a zero range. However, we are not dropping zero tonnes values as it can be informative in telling the disposal activity here is negligible.
 
 Due to the skewness of Tonnes value, it is more suitable to create non-uniform range over a uniform range from 0 to max tonnes. To decide on range, we first observe some sensible breakpoints:
 
@@ -1125,7 +1215,7 @@ ggplot(tonnes_state, aes(x = reorder(State, Frequency, sum), y = Frequency, fill
   geom_col(position = "stack") +
   coord_flip() +
   scale_fill_manual(values = c(
-    "0 (none disposed)" = "#FFF7BC", # light shade for less significant ) disposal
+    "0 (none disposed)" = "#FFF7BC", # light shade for less significant disposal
     "0-500"             = "#FEE391",
     "500-5000"         = "#FEC44F",
     "5000-20000"      = "#D95F0E",
@@ -1140,11 +1230,11 @@ ggplot(tonnes_state, aes(x = reorder(State, Frequency, sum), y = Frequency, fill
   theme_minimal()
 ```
 
-From the bar chart, it inform the manager:
+From the bar chart, it tells the manager:
 
-1.  State with bar dominated by darker shade (eg: 20000+) are great state for investing in large-scale processing capacity.
-2.  State with higher frequency mostly in lighter shades (eg: 0, 0-500) suggest many small disposal event, justifying it is not suitable for large infrastructure investment in these states.
-3.  For instance, VIC, NSW and QLD are best to invest for large-scale tyres processing capacity due to higher frequency of disposal event happening at range of 20000+.
+1.  State that heavily weights at the darker shade (eg: 20000+) are great state for investing in large-scale processing capacity. It show a pattern of large, sustained disposal events, meaning large-scale processing infrastructure built there is more likely to have a consistent supply of substantial waste volumes to process.
+2.  State with disposal cases cluster in the lighter bins (eg: 0, 0-500) suggest many small disposal event, justifying it is not suitable for large infrastructure investment in these states. Large-scale infrastructure being built there risks being underutilized, since there is no consistent stream of high-volume disposal to justify.
+3.  VIC, NSW, QLD and WA are best candidate state to invest for large-scale tyres processing capacity due to higher volume of disposal event happening at range of 20000+. This suggestion is based on disposal volume and consistency alone. The final investment decisions would also need to weigh factors outside this dataset, such as transport, logistics, existing infrastructure and labour costs.
 
 ## Q9 Factor influencing yearly trend of total C&D waste tonnes.
 
@@ -1249,6 +1339,7 @@ We can replace the State/Territory values to match our waste_year_formatted.
 ```{R}
 # view how state are formatted in waste_year_formatted
 waste_year_formatted %>% distinct(State)
+
 # view how State/Territory are formatted in population
 population %>% distinct(`State/Territory`)
 ```
@@ -1269,24 +1360,36 @@ population_formatted <- population %>%
     `State/Territory` = case_when(
       `State/Territory` == "Australia(e)" & Sex == "Male" ~ "Total Male",
       `State/Territory` == "Australia(e)" & Sex == "Female" ~ "Total Female",
-      `State/Territory` == "Australia(e)" & Sex == "Person" ~ "Total",
+      `State/Territory` == "Australia(e)" & Sex == "Person" ~ "Total Population",
       TRUE ~ `State/Territory`
     )
   ) %>%
   filter(!is.na(`State/Territory`)) %>%
   arrange(`State/Territory`)
 
-population_formatted
+```
+
+Now, observe population_formatted and waste_year_formatted State or State/Territory have been standardized, with population_formatted having additional "Total Female", "Total Male" and "Total Population".
+
+```{R}
+# view how state are formatted in waste_year_formatted
+waste_year_formatted %>% distinct(State)
+```
+
+```{R}
+# view how State/Territory are formatted in population_formatted
+population_formatted %>% distinct(`State/Territory`)
 ```
 
 ### Filtering C&D waste from waste_year_formatted
 
-We are only interested in C&D Stream waste. So we filter and save these waste in cnd_waste table. Since waste_year_formatted have been cleaned in previous tasks, hence no additional cleaning required here.
+We are only interested in C&D (Construction and Demolition) Stream waste. So we filter and save these waste in cnd_waste table. Since waste_year_formatted have been cleaned in previous tasks, hence no additional cleaning required here.
 
 ```{R}
 cnd_waste <- waste_year_formatted %>%
   filter(Stream == "C&D") %>%
   select(-c("Description", "start", "end"))
+
 cnd_waste 
 ```
 
@@ -1297,10 +1400,9 @@ cnd_state <- cnd_waste %>%
   group_by(State, Year) %>%
   summarise(
     Total_CND_Tonnes = sum(Tonnes)
-  ) %>%
-  arrange(Year)
+  ) 
 
-cnd_state
+cnd_state %>% arrange(Year)
 ```
 
 ### Joining cnd_state and population_formatted
@@ -1309,20 +1411,20 @@ To join the 2 table, we observe the pattern of both tables.
 
 ```{R}
 population_formatted %>% head()
-cnd_state %>% head()
+cnd_state %>% head(20)
 ```
 
 We observe in population_formatted, we have columns of:
 
 - Sex: Male, Female, Person
 
-- State/Territory: repeating capitalized abbreviated state name
+- State/Territory: repeating capitalized abbreviated state name for 3 times due to each row representing Male, Female and Person.
 
 - 2006 to 2020: each value indicating total male, total female and total population of the respective year
 
 We observe in cnd_state we have columns of:
 
-- State: non-repeating capitalized abbreviated state name
+- State: non-repeating capitalized abbreviated state name for each year
 
 - Year: 2006-2020
 
@@ -1372,7 +1474,7 @@ cnd_population
 
 ### Visualisation
 
-To determine if population size directly affect C&D Tonnes disposal, a scatterplot and linear trendline is used. X-axis represent total popuation, y-axis represent total C&D tonnes, each point is shaped uniquely according to state.
+To determine if population size directly affect C&D Tonnes disposal, a scatterplot and linear trendline is used. X-axis represent total population, y-axis represent total C&D tonnes, each point is shaped uniquely according to state.
 
 Scatterplot and trendline is used because:
 
@@ -1385,17 +1487,14 @@ ggplot(cnd_population, aes(x = Total_Population, y = Total_CND_Tonnes)) +
   geom_point(aes(color = Year, shape = State), size = 3, alpha = 0.8) +
   geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed") +
   scale_color_viridis_c() +
+  scale_shape_manual(values = c(0, 1, 2, 3, 4, 5, 6, 8)) +
   scale_x_continuous(labels = scales::comma) +
   labs(
     title = "Relationship Between Population and CND Waste (2006–2020)",
-    subtitle = "Points represent individual years per state",
-    x = "Total Population",
-    y = "Total CND Waste (Tonnes)",
-    color = "Year",
-    shape = "State"
+    x = "Total Population", y = "Total CND Waste (Tonnes)",
+    color = "Year", shape = "State"
   ) +
   theme_minimal()
-
 ```
 
 From the scatterplot, we observe that:
@@ -1403,27 +1502,5 @@ From the scatterplot, we observe that:
 - Trendline shows a positive linear relationship between total C&D tonnes and population. States and years with population proportionally generates lower C&D waste tonnes; whereas states and years with higher population increases C&D waste tonnes.
 
 - This enable us to generate the **hypothesis** that the underlying reason can be when population increases, more housing and facility will need to be constructed to support the community, resulting in higher disposal of C&D due to higher construction activity.
-
-### IDK BRO
-
-```{R}
-# 1. Calculate Waste Per Capita (Tonnes per person)
-combined_data <- cnd_population %>%
-  mutate(CND_per_capita = Total_CND_Tonnes / Total_Population)
-
-# 2. Line plot of Per Capita waste across years by State
-ggplot(combined_data, aes(x = Year, y = CND_per_capita, color = State, group = State)) +
-  geom_line(linewidth = 1) +
-  geom_point(size = 2) +
-  facet_wrap(~ State, scales = "free_y") +  # Individual panel per state
-  labs(
-    title = "CND Waste Per Capita Trend Across Years",
-    x = "Year",
-    y = "CND Waste Per Person (Tonnes)",
-    caption = "Source: ABS & CND Waste Datasets"
-  ) +
-  theme_bw() +
-  theme(legend.position = "none")
-```
 
 ### 
